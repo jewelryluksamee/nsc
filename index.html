@@ -1,0 +1,2853 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HisTalk - แถบเลื่อนข้ามเวลา</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=Cinzel:wght@600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+        :root {
+            --bg-sidebar: #FFFFFF;
+            --bg-sidebar-header: #FDFAF4;
+            --bg-card: #FFFFFF;
+            --bg-card-hover: #FDFAF5;
+            --bg-section: #F9F6EE;
+            --bg-input: #F3EFE4;
+            --text-main: #1C2333;
+            --text-muted: #8390A2;
+            --text-sub: #6B7A8D;
+            --primary: #C9A227;
+            --primary-dark: #A8841A;
+            --primary-light: #E8C84A;
+            --primary-subtle: rgba(201,162,39,0.1);
+            --accent-red: #D94F4F;
+            --border: #EAE4D6;
+            --border-strong: #D9D0BB;
+            --border-gold: rgba(201,162,39,0.3);
+            --shadow-sm: 0 1px 4px rgba(28,35,51,0.07);
+            --shadow-md: 0 4px 16px rgba(28,35,51,0.09);
+            --shadow-lg: 0 8px 32px rgba(28,35,51,0.13);
+            --sidebar-w: 360px;
+            --timeline-h: 152px;
+            --navbar-h: 56px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Prompt', sans-serif; }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(201,162,39,0.25); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(201,162,39,0.5); }
+
+        body { background: #1a1a2e; color: var(--text-main); height: 100vh; overflow: hidden; }
+
+        /* ── FULL-SCREEN MAP ── */
+        #leaflet-map { position: fixed; top: var(--navbar-h); left: 0; right: 0; bottom: 0; z-index: 0; }
+        .leaflet-container { font-family: 'Prompt', sans-serif !important; }
+        .era-legend {
+            background: rgba(255,255,255,0.96);
+            padding: 6px 14px; border-radius: 10px;
+            font-size: 0.72rem; font-weight: 600;
+            border: 1px solid var(--border-gold);
+            box-shadow: 0 4px 16px rgba(28,35,51,0.12);
+            color: var(--text-main);
+        }
+        .city-label {
+            background: rgba(255,255,255,0.95);
+            padding: 3px 9px; border-radius: 20px;
+            font-size: 0.67rem; font-weight: 600;
+            box-shadow: 0 2px 8px rgba(28,35,51,0.1);
+            border: 1px solid rgba(201,162,39,0.3);
+            color: var(--text-main);
+            display: flex; align-items: center; gap: 5px; white-space: nowrap;
+        }
+        .city-label::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #D94F4F; flex-shrink: 0; }
+        .city-label.capital-label::before { background: var(--primary); width: 8px; height: 8px; }
+
+        /* ── RIGHT SIDEBAR ── */
+        .right-sidebar {
+            position: fixed;
+            right: 0; top: var(--navbar-h); bottom: 0;
+            width: var(--sidebar-w);
+            z-index: 100;
+            background: var(--bg-sidebar);
+            border-left: 1.5px solid var(--border);
+            box-shadow: -6px 0 40px rgba(28,35,51,0.13);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .top-navbar::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, var(--primary-dark), var(--primary), var(--primary-light), var(--primary));
+        }
+
+        /* Sidebar top: logo */
+        .sidebar-top {
+            padding: 17px 18px 14px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            background: var(--bg-sidebar-header);
+        }
+        .logo-area { display: flex; align-items: center; gap: 12px; }
+        .logo-icon {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            padding: 9px; border-radius: 13px;
+            display: flex; align-items: center;
+            box-shadow: 0 4px 16px rgba(201,162,39,0.35);
+        }
+        .logo-text h1 { font-size: 1.2rem; font-weight: 700; color: var(--primary-dark); line-height: 1.1; font-family: 'Cinzel', 'Prompt', serif; letter-spacing: 0.03em; }
+        .logo-text p { font-size: 0.59rem; color: var(--text-muted); margin-top: 2px; letter-spacing: 0.02em; }
+        .online-badge {
+            font-size: 0.61rem;
+            background: #EDFAF4;
+            color: #1E8A5E;
+            padding: 3px 11px; border-radius: 20px;
+            font-weight: 600; white-space: nowrap;
+            border: 1px solid #ACDEC6;
+        }
+
+        /* Sidebar profile */
+        .sidebar-profile {
+            padding: 11px 15px;
+            background: var(--bg-section);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+        .profile-avatar { font-size: 1.9rem; line-height: 1; }
+        .profile-name h3 { font-size: 0.82rem; font-weight: 600; line-height: 1.3; color: var(--text-main); }
+        .profile-name p { font-size: 0.62rem; color: var(--text-muted); margin-top: 1px; }
+        .call-toggle-btn {
+            margin-left: auto;
+            background: var(--text-main);
+            color: white;
+            border: none;
+            padding: 7px 13px; border-radius: 10px;
+            font-size: 0.67rem; font-weight: 600; cursor: pointer;
+            display: flex; align-items: center; gap: 6px;
+            font-family: 'Prompt', sans-serif; white-space: nowrap;
+            transition: all 0.2s;
+            box-shadow: var(--shadow-sm);
+        }
+        .call-toggle-btn:hover { background: #2D3A50; box-shadow: var(--shadow-md); }
+        .call-toggle-btn.in-call { background: var(--accent-red); }
+
+        /* Character list */
+        .sidebar-chars {
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            flex-shrink: 0;
+        }
+        .char-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 8px 10px; border: 1.5px solid var(--border);
+            border-radius: 10px; cursor: pointer;
+            transition: all 0.15s ease;
+            background: white;
+            width: 100%; text-align: left;
+        }
+        .char-item:hover { background: var(--bg-card-hover); border-color: var(--border-gold); box-shadow: var(--shadow-sm); }
+        .char-item.active { border-color: var(--primary); background: #FDFAF4; }
+        .char-avatar {
+            font-size: 1.3rem; background: var(--bg-section);
+            width: 34px; height: 34px; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        .char-info h4 { font-size: 0.78rem; font-weight: 600; color: var(--text-main); }
+        .char-info p { font-size: 0.62rem; color: var(--text-muted); }
+
+        /* Chat messages area */
+        .sidebar-chat {
+            flex: 1;
+            overflow-y: auto;
+            padding: 14px;
+            background: #F7F4EC;
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-container { display: flex; flex-direction: column; gap: 10px; justify-content: flex-end; flex: 1; }
+        .msg-bubble { max-width: 88%; padding: 10px 14px; border-radius: 16px; font-size: 0.8rem; line-height: 1.55; animation: fadeIn 0.25s ease; }
+        .msg-bubble.bot {
+            background: white;
+            border: 1.5px solid var(--border);
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+            color: var(--text-main);
+            box-shadow: var(--shadow-sm);
+        }
+        .msg-bubble.user {
+            background: linear-gradient(135deg, #1C2333, #2D3A50);
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+            box-shadow: 0 4px 14px rgba(28,35,51,0.2);
+        }
+        .msg-time { font-size: 0.58rem; color: var(--text-muted); display: block; margin-top: 4px; }
+        .msg-bubble.user .msg-time { color: rgba(255,255,255,0.45); }
+
+        /* Chat message layout with avatar */
+        .msg-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 12px;
+            max-width: 100%;
+            animation: fadeIn 0.25s ease;
+        }
+        .msg-row.user-row {
+            justify-content: flex-end;
+        }
+        .msg-row.bot-row {
+            justify-content: flex-start;
+        }
+        .msg-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            overflow: hidden;
+            flex-shrink: 0;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .msg-bubble-wrapper {
+            display: flex;
+            flex-direction: column;
+            max-width: 78%;
+        }
+        .msg-row.user-row .msg-bubble-wrapper {
+            align-items: flex-end;
+        }
+        .msg-row.bot-row .msg-bubble-wrapper {
+            align-items: flex-start;
+        }
+        .msg-row.bot-row .msg-bubble {
+            align-self: flex-start;
+        }
+        .msg-row.user-row .msg-bubble {
+            align-self: flex-end;
+        }
+        /* SVG avatars styles */
+        .char-avatar svg,
+        .char-card-avatar svg,
+        .profile-avatar svg,
+        .call-avatar svg,
+        .history-avatar svg,
+        .up-avatar svg,
+        .msg-avatar svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+            border-radius: inherit;
+        }
+        /* Hide backgrounds or padding if they interfere with custom SVGs */
+        .char-card-avatar, .char-avatar, .history-avatar {
+            padding: 0 !important;
+            overflow: hidden;
+        }
+        .fallback-emoji-avatar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            font-size: 1.25em;
+        }
+
+        /* Keyword chips */
+        .keyword-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; align-self: flex-start; max-width: 100%; }
+        .chips-label { width: 100%; font-size: 0.61rem; color: var(--text-muted); margin-bottom: 3px; }
+        .keyword-chip {
+            background: white;
+            border: 1.5px solid var(--border-gold);
+            border-radius: 20px; padding: 4px 12px;
+            font-size: 0.67rem; font-weight: 500;
+            cursor: pointer; transition: all 0.18s ease;
+            color: var(--primary-dark);
+            font-family: 'Prompt', sans-serif;
+            box-shadow: var(--shadow-sm);
+        }
+        .keyword-chip:hover { background: var(--primary-subtle); border-color: var(--primary); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+
+        /* Call view */
+        .call-container {
+            display: none; flex-direction: column;
+            align-items: center; justify-content: center;
+            margin: auto; text-align: center; padding: 24px;
+        }
+        .avatar-ring-container { position: relative; margin-bottom: 20px; }
+        .call-avatar {
+            width: 90px; height: 90px;
+            background: #FDF8EC;
+            border: 2px solid rgba(201,162,39,0.4);
+            border-radius: 50%; font-size: 3.2rem;
+            display: flex; align-items: center; justify-content: center;
+            position: relative; z-index: 2;
+            box-shadow: var(--shadow-md);
+        }
+        .pulse-ring {
+            position: absolute; inset: 0;
+            background: rgba(201,162,39,0.15);
+            border-radius: 50%;
+            animation: ringPulse 2s infinite ease-out; z-index: 1;
+        }
+        .call-container h4 { font-size: 1rem; font-weight: 600; margin-bottom: 8px; color: var(--text-main); }
+        .call-status-text {
+            background: #FDF8EC; color: var(--primary-dark);
+            font-size: 0.68rem; font-weight: 500;
+            padding: 5px 14px; border-radius: 20px;
+            display: flex; align-items: center; gap: 6px;
+            border: 1px solid rgba(201,162,39,0.3);
+        }
+        .voice-subtitle {
+            margin-top: 22px;
+            background: white;
+            border: 1.5px solid var(--border);
+            padding: 14px 16px; border-radius: 14px;
+            font-style: italic; font-size: 0.78rem;
+            color: var(--text-sub); line-height: 1.6;
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* Chat input */
+        .sidebar-input {
+            padding: 12px 14px;
+            background: white;
+            border-top: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+        .input-wrapper { display: flex; gap: 8px; }
+        .input-wrapper input {
+            flex: 1; padding: 11px 16px;
+            background: var(--bg-input);
+            border: 1.5px solid var(--border);
+            border-radius: 12px;
+            font-size: 0.8rem; outline: none;
+            font-family: 'Prompt', sans-serif;
+            color: var(--text-main);
+            transition: all 0.2s;
+        }
+        .input-wrapper input::placeholder { color: var(--text-muted); }
+        .input-wrapper input:focus {
+            border-color: var(--primary);
+            background: white;
+            box-shadow: 0 0 0 3px rgba(201,162,39,0.1);
+        }
+        .send-btn {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none; padding: 0 18px; border-radius: 12px;
+            font-weight: 700; font-size: 0.8rem; cursor: pointer;
+            display: flex; align-items: center; gap: 6px;
+            font-family: 'Prompt', sans-serif;
+            transition: all 0.2s;
+            box-shadow: 0 4px 16px rgba(201,162,39,0.3);
+        }
+        .send-btn:hover { box-shadow: 0 6px 24px rgba(201,162,39,0.45); transform: translateY(-1px); }
+        .sidebar-disclaimer { font-size: 0.57rem; color: var(--text-muted); text-align: center; margin-top: 7px; }
+
+        /* ── BOTTOM TIMELINE BAR ── */
+        .timeline-bar {
+            position: fixed;
+            bottom: 0; left: 0;
+            right: var(--sidebar-w);
+            height: var(--timeline-h);
+            z-index: 100;
+            background: rgba(255, 252, 246, 0.98);
+            backdrop-filter: blur(20px);
+            border-top: 1.5px solid var(--border);
+            box-shadow: 0 -6px 32px rgba(28,35,51,0.1);
+            padding: 13px 28px 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+
+        .timeline-bar::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--primary-dark) 30%, var(--primary), var(--primary-light) 70%, transparent);
+        }
+
+        .timeline-top { display: flex; align-items: center; gap: 16px; }
+        .year-block { flex-shrink: 0; }
+        .yn-label { font-size: 0.57rem; color: var(--text-muted); display: block; letter-spacing: 0.07em; text-transform: uppercase; }
+        .yn-value {
+            font-size: 2rem; font-weight: 700; color: var(--primary-dark); line-height: 1;
+            font-family: 'Cinzel', 'Prompt', serif;
+        }
+        .yn-ce { font-size: 0.63rem; color: var(--text-muted); }
+        .era-pill {
+            padding: 6px 16px; border-radius: 20px;
+            font-size: 0.73rem; font-weight: 600; color: white;
+            transition: background 0.4s; flex-shrink: 0;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.2);
+        }
+
+        /* Era info badges */
+        .era-quick-info { display: flex; gap: 7px; flex-wrap: wrap; align-items: center; flex: 1; }
+        .era-info-badge {
+            display: flex; align-items: center; gap: 5px;
+            background: white;
+            border: 1.5px solid var(--border);
+            border-radius: 8px; padding: 4px 10px; font-size: 0.64rem;
+            box-shadow: var(--shadow-sm);
+        }
+        .era-info-badge .label { color: var(--text-muted); }
+        .era-info-badge .value { font-weight: 600; color: var(--text-main); }
+        .era-highlights-row { display: flex; gap: 10px; flex-wrap: wrap; }
+        .era-highlight-item {
+            font-size: 0.62rem; color: var(--text-sub);
+            display: flex; align-items: flex-start; gap: 4px; line-height: 1.4;
+        }
+        .era-highlight-item::before { content: '•'; color: var(--primary); font-weight: 700; flex-shrink: 0; }
+
+        /* Slider */
+        .time-slider {
+            -webkit-appearance: none; appearance: none;
+            width: 100%; height: 5px; border-radius: 10px;
+            background: var(--border);
+            outline: none; cursor: pointer;
+        }
+        .time-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 22px; height: 22px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary-light), var(--primary-dark));
+            border: 3px solid white;
+            box-shadow: 0 2px 12px rgba(201,162,39,0.45);
+            transition: transform 0.12s;
+        }
+        .time-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+        /* Era color bar */
+        .era-timeline-bar {
+            display: flex; height: 20px; border-radius: 8px;
+            overflow: hidden; border: 1px solid var(--border);
+        }
+        .era-bar-seg {
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.57rem; font-weight: 700;
+            color: rgba(255,255,255,0.88);
+            cursor: pointer; opacity: 0.55;
+            transition: opacity 0.22s; overflow: hidden;
+            white-space: nowrap; padding: 0 4px; user-select: none;
+        }
+        .era-bar-seg.active { opacity: 1; filter: brightness(1.08); }
+        .era-bar-seg:hover { opacity: 0.85; }
+        .era-timeline-labels { display: flex; }
+        .era-tl-label { font-size: 0.57rem; color: var(--text-muted); overflow: hidden; text-align: center; }
+
+        /* ── ERA FLOATING INFO BOX ── */
+        .era-float-wrap {
+            position: fixed;
+            left: 10px;
+            top: calc(var(--navbar-h) + 10px);
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+        }
+        .era-float-box {
+            width: 250px;
+            background: rgba(255, 252, 246, 0.97);
+            backdrop-filter: blur(18px);
+            border-radius: 18px;
+            border: 1.5px solid var(--border-gold);
+            box-shadow: 0 8px 32px rgba(28,35,51,0.15);
+            overflow: hidden;
+            transition: border-color 0.4s ease, opacity 0.25s ease, transform 0.25s ease, max-height 0.3s ease;
+            max-height: 600px;
+        }
+        .era-float-box.collapsed {
+            opacity: 0;
+            transform: translateY(-6px) scale(0.97);
+            max-height: 0;
+            pointer-events: none;
+        }
+        .efb-toggle-btn {
+            width: 38px; height: 38px;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(255, 252, 246, 0.97);
+            backdrop-filter: blur(18px);
+            border: 1.5px solid var(--border-gold);
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(28,35,51,0.12);
+            cursor: pointer;
+            color: var(--text-main);
+            transition: all 0.2s;
+            position: relative;
+        }
+        .efb-toggle-btn:hover { box-shadow: 0 6px 24px rgba(28,35,51,0.18); background: white; transform: scale(1.06); }
+        .efb-toggle-btn.active { background: white; border-color: var(--primary); }
+        .efb-era-badge {
+            position: absolute;
+            top: -4px; right: -4px;
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            border: 2px solid white;
+            transition: background 0.4s;
+        }
+        .efb-header {
+            padding: 12px 14px 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+        .efb-era-dot {
+            width: 11px; height: 11px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            transition: background 0.4s ease;
+            box-shadow: 0 0 0 3px rgba(255,255,255,0.8);
+        }
+        .efb-era-name {
+            font-size: 0.82rem; font-weight: 700;
+            color: var(--text-main);
+            font-family: 'Cinzel', 'Prompt', serif;
+            transition: color 0.4s ease;
+            flex: 1;
+        }
+        .efb-close-btn {
+            background: none; border: none; cursor: pointer;
+            color: var(--text-muted); padding: 2px; border-radius: 6px;
+            display: flex; align-items: center;
+            transition: color 0.15s, background 0.15s;
+            flex-shrink: 0;
+        }
+        .efb-close-btn:hover { color: var(--text-main); background: var(--bg-section); }
+        .efb-body { display: flex; flex-direction: column; max-height: 440px; overflow-y: auto; }
+        .efb-section { padding: 10px 14px 11px; display: flex; flex-direction: column; gap: 7px; }
+        .efb-section + .efb-section { border-top: 1px solid var(--border); }
+        .efb-section-label {
+            font-size: 0.53rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.09em; color: var(--text-muted);
+            display: flex; align-items: center; gap: 6px;
+        }
+        .efb-year-tag {
+            background: var(--primary-subtle); color: var(--primary-dark);
+            border: 1px solid var(--border-gold);
+            padding: 1px 7px; border-radius: 10px;
+            font-size: 0.55rem; font-weight: 700;
+        }
+        .efb-row { display: flex; align-items: baseline; gap: 6px; }
+        .efb-label { font-size: 0.58rem; color: var(--text-muted); flex-shrink: 0; min-width: 54px; }
+        .efb-value { font-size: 0.72rem; font-weight: 600; color: var(--text-main); line-height: 1.4; }
+        .efb-highlight-row {
+            font-size: 0.61rem; color: var(--text-sub); line-height: 1.45;
+            display: flex; gap: 5px; align-items: flex-start;
+        }
+        .efb-highlight-row::before { content: '•'; color: var(--primary); font-weight: 700; flex-shrink: 0; }
+        .efb-king-card {
+            background: var(--bg-section); border-radius: 10px; padding: 9px 11px;
+            display: flex; flex-direction: column; gap: 3px;
+            border: 1px solid var(--border);
+        }
+        .efb-king-name { font-size: 0.72rem; font-weight: 700; color: var(--text-main); line-height: 1.35; }
+        .efb-king-meta { font-size: 0.59rem; color: var(--text-muted); }
+        .efb-king-notable { font-size: 0.61rem; color: var(--text-sub); line-height: 1.4; font-style: italic; margin-top: 2px; }
+        .efb-event-card {
+            background: white; border: 1.5px solid var(--border);
+            border-radius: 10px; padding: 9px 11px;
+            display: flex; flex-direction: column; gap: 3px;
+            transition: border-color 0.2s;
+        }
+        .efb-event-card + .efb-event-card { margin-top: 6px; }
+        .efb-event-year { font-size: 0.56rem; color: var(--primary-dark); font-weight: 700; }
+        .efb-event-title { font-size: 0.71rem; font-weight: 700; color: var(--text-main); line-height: 1.3; }
+        .efb-event-desc { font-size: 0.6rem; color: var(--text-sub); line-height: 1.5; margin-top: 2px; }
+        .efb-event-upcoming .efb-event-year { color: var(--text-muted); }
+        .efb-event-upcoming { border-style: dashed; opacity: 0.8; }
+        .efb-empty { font-size: 0.61rem; color: var(--text-muted); font-style: italic; text-align: center; padding: 4px 0; }
+        .efb-world-card {
+            background: #F0F7FF; border: 1.5px solid #BEE3F8;
+            border-radius: 10px; padding: 9px 11px;
+            display: flex; flex-direction: column; gap: 3px;
+        }
+        .efb-world-card + .efb-world-card { margin-top: 6px; }
+        .efb-world-country { font-size: 0.56rem; font-weight: 700; color: #2B6CB0; }
+        .efb-world-title { font-size: 0.71rem; font-weight: 700; color: var(--text-main); line-height: 1.3; }
+        .efb-world-desc { font-size: 0.6rem; color: var(--text-sub); line-height: 1.5; margin-top: 2px; }
+
+        /* ── SIDEBAR RESIZE HANDLE ── */
+        .sidebar-resize-handle {
+            position: fixed;
+            top: var(--navbar-h);
+            bottom: 0;
+            width: 5px;
+            cursor: ew-resize;
+            z-index: 150;
+            background: transparent;
+            transition: background 0.2s;
+        }
+        .sidebar-resize-handle:hover,
+        .sidebar-resize-handle.dragging { background: rgba(201,162,39,0.35); }
+
+        /* ── CHARACTER SELECTION VIEW ── */
+        .char-selection-view { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+        .selection-header {
+            padding: 14px 16px 12px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+            background: var(--bg-sidebar-header);
+        }
+        .selection-title { font-size: 0.9rem; font-weight: 700; color: var(--text-main); }
+        .selection-subtitle { font-size: 0.67rem; color: var(--text-muted); margin-top: 3px; }
+        .char-cards-grid { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: var(--bg-section); }
+        .char-card {
+            display: flex; align-items: flex-start; gap: 13px;
+            padding: 14px;
+            border: 1.5px solid var(--border);
+            border-radius: 14px; cursor: pointer;
+            transition: all 0.2s ease;
+            background: white;
+            text-align: left; width: 100%;
+            box-shadow: var(--shadow-sm);
+        }
+        .char-card:hover {
+            border-color: var(--primary);
+            background: #FDFAF4;
+            box-shadow: 0 4px 20px rgba(201,162,39,0.16);
+            transform: translateY(-2px);
+        }
+        .char-card.king-card {
+            border-color: rgba(201,162,39,0.3);
+            background: #FDFAF6;
+        }
+        .char-card.king-card:hover {
+            border-color: var(--primary);
+            box-shadow: 0 6px 24px rgba(201,162,39,0.22);
+        }
+        .char-card-avatar {
+            font-size: 1.9rem;
+            background: var(--bg-section);
+            width: 54px; height: 54px;
+            border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+            border: 1.5px solid var(--border);
+        }
+        .char-card.king-card .char-card-avatar {
+            background: #FDF8EC;
+            border-color: rgba(201,162,39,0.35);
+        }
+        .char-card-info { flex: 1; min-width: 0; }
+        .char-card-info h4 { font-size: 0.82rem; font-weight: 700; line-height: 1.3; white-space: normal; color: var(--text-main); }
+        .char-card-info .role { font-size: 0.62rem; color: var(--text-muted); margin-top: 3px; }
+        .char-card-info .notable { font-size: 0.62rem; color: var(--primary-dark); margin-top: 6px; line-height: 1.45; }
+
+        /* Chat panel */
+        .chat-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+        .back-btn {
+            background: white;
+            color: var(--text-main);
+            border: 1.5px solid var(--border);
+            padding: 5px 11px; border-radius: 9px;
+            font-size: 0.63rem; font-weight: 600;
+            cursor: pointer; font-family: 'Prompt', sans-serif;
+            white-space: nowrap; flex-shrink: 0;
+            transition: all 0.15s;
+            box-shadow: var(--shadow-sm);
+        }
+        .back-btn:hover { background: var(--bg-section); border-color: var(--border-strong); }
+
+        @keyframes ringPulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.65); opacity: 0; } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* ── PROFILE NAV BUTTON ── */
+        .profile-nav-btn {
+            background: white;
+            border: 1.5px solid var(--border);
+            border-radius: 9px; padding: 7px; cursor: pointer;
+            color: var(--text-muted); display: flex; align-items: center;
+            transition: all 0.15s; flex-shrink: 0;
+            box-shadow: var(--shadow-sm);
+        }
+        .profile-nav-btn:hover { background: var(--bg-section); color: var(--text-main); }
+        .profile-nav-btn.active {
+            background: var(--primary-subtle);
+            color: var(--primary-dark);
+            border-color: var(--border-gold);
+        }
+
+        /* ── USER PROFILE PAGE ── */
+        .user-page { flex: 1; display: none; flex-direction: column; overflow: hidden; min-height: 0; }
+
+        .up-header {
+            padding: 18px 16px 16px;
+            background: linear-gradient(135deg, #1C2333 0%, #2D3A50 100%);
+            color: white; flex-shrink: 0;
+        }
+        .up-avatar-row { display: flex; align-items: center; gap: 13px; margin-bottom: 14px; }
+        .up-avatar {
+            width: 54px; height: 54px;
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            border-radius: 50%; font-size: 1.7rem;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+        .up-name { font-size: 1.05rem; font-weight: 700; line-height: 1.2; color: white; }
+        .up-level-label { font-size: 0.63rem; color: var(--primary-light); font-weight: 600; margin-top: 3px; }
+        .xp-bar-wrap { margin-top: 9px; }
+        .xp-labels { font-size: 0.59rem; color: rgba(255,255,255,0.5); margin-bottom: 6px; display: flex; justify-content: space-between; }
+        .xp-track { background: rgba(255,255,255,0.15); border-radius: 10px; height: 6px; overflow: hidden; }
+        .xp-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary-dark), var(--primary), var(--primary-light));
+            border-radius: 10px; transition: width 0.85s ease; min-width: 4px;
+        }
+
+        .up-stats { display: flex; border-top: 1px solid rgba(255,255,255,0.12); padding-top: 14px; margin-top: 4px; }
+        .up-stat { flex: 1; text-align: center; }
+        .up-stat + .up-stat { border-left: 1px solid rgba(255,255,255,0.12); }
+        .up-stat .sv { font-size: 1.3rem; font-weight: 700; color: var(--primary-light); }
+        .up-stat .sl { font-size: 0.56rem; color: rgba(255,255,255,0.45); margin-top: 2px; }
+
+        .up-body { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-section); }
+        .up-section-title {
+            font-size: 0.65rem; font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 0.09em;
+            margin-bottom: 10px;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .up-section-title::after {
+            content: ''; flex: 1; height: 1px;
+            background: linear-gradient(90deg, var(--border-strong), transparent);
+        }
+
+        /* Badges */
+        .badges-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; }
+        .badge-item { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: default; }
+        .badge-icon {
+            width: 48px; height: 48px; border-radius: 13px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.4rem; border: 1px solid transparent; transition: all 0.22s;
+        }
+        .badge-icon.unlocked {
+            background: #FDF8EC;
+            border-color: rgba(201,162,39,0.4);
+            box-shadow: 0 3px 14px rgba(201,162,39,0.2);
+        }
+        .badge-icon.locked { background: white; border-color: var(--border); filter: grayscale(1); opacity: 0.35; }
+        .badge-name { font-size: 0.54rem; text-align: center; color: var(--text-muted); line-height: 1.3; }
+        .badge-name.unlocked { color: var(--primary-dark); font-weight: 600; }
+        .badges-count { font-size: 0.63rem; color: var(--text-muted); margin-top: 8px; text-align: right; }
+
+        /* History */
+        .history-list { display: flex; flex-direction: column; gap: 6px; }
+        .history-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 12px;
+            background: white;
+            border: 1.5px solid var(--border);
+            border-radius: 12px;
+            transition: all 0.15s;
+            box-shadow: var(--shadow-sm);
+        }
+        .history-item:hover { border-color: var(--border-gold); box-shadow: var(--shadow-md); }
+        .history-avatar { font-size: 1.4rem; flex-shrink: 0; width: 34px; text-align: center; }
+        .history-info { flex: 1; min-width: 0; }
+        .hi-name { font-size: 0.74rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-main); }
+        .hi-meta { font-size: 0.58rem; color: var(--text-muted); margin-top: 2px; }
+        .hi-count {
+            font-size: 0.61rem; color: var(--primary-dark); font-weight: 600;
+            background: #FDF8EC;
+            border: 1px solid rgba(201,162,39,0.3);
+            padding: 2px 9px; border-radius: 20px; flex-shrink: 0; white-space: nowrap;
+        }
+        .empty-state {
+            text-align: center; padding: 32px 16px;
+            color: var(--text-muted); font-size: 0.74rem; line-height: 1.7;
+        }
+        .empty-state .es-icon { font-size: 2.4rem; display: block; margin-bottom: 10px; opacity: 0.28; }
+
+        /* Achievement toast */
+        .achievement-toast {
+            position: fixed; bottom: 175px; left: 50%;
+            transform: translateX(-50%) translateY(14px);
+            background: linear-gradient(135deg, #1C2333, #2D3A50);
+            color: white;
+            padding: 12px 20px; border-radius: 20px;
+            font-size: 0.74rem; font-weight: 600;
+            display: flex; align-items: center; gap: 8px;
+            box-shadow: 0 10px 40px rgba(28,35,51,0.35), 0 0 0 1px rgba(201,162,39,0.25);
+            z-index: 9999; opacity: 0;
+            transition: opacity 0.32s ease, transform 0.32s ease;
+            pointer-events: none; white-space: nowrap;
+        }
+        .achievement-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        /* ── TOP NAVBAR ── */
+        .top-navbar {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: var(--navbar-h);
+            z-index: 200;
+            background: var(--bg-sidebar-header);
+            border-bottom: 1.5px solid var(--border);
+            box-shadow: var(--shadow-md);
+            display: flex;
+            align-items: center;
+            padding: 0 20px 0 16px;
+            gap: 0;
+        }
+        .top-navbar .logo-area { flex-shrink: 0; gap: 10px; display: flex; align-items: center; margin-right: 24px; }
+        .top-navbar .logo-icon { padding: 7px; border-radius: 11px; }
+        .top-navbar .logo-text h1 { font-size: 1.1rem; }
+        .top-navbar .logo-text p { display: none; }
+        .nav-tabs { display: flex; align-items: stretch; height: 100%; }
+        .nav-tab {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 7px;
+            padding: 0 18px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            border: none;
+            border-bottom: 2.5px solid transparent;
+            background: transparent;
+            font-family: 'Prompt', sans-serif;
+            transition: all 0.15s;
+            white-space: nowrap;
+            height: 100%;
+        }
+        .nav-tab:hover { color: var(--text-main); background: var(--bg-section); }
+        .nav-tab.active { color: var(--primary-dark); border-bottom-color: var(--primary); background: white; }
+
+        /* ── MUSEUM PAGE ── */
+        .museum-page { flex: 1; display: none; flex-direction: column; overflow: hidden; min-height: 0; }
+        .museum-grid { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: var(--bg-section); }
+        .exhibit-card {
+            background: white; border: 1.5px solid var(--border);
+            border-radius: 14px; padding: 14px;
+            box-shadow: var(--shadow-sm); transition: all 0.2s;
+        }
+        .exhibit-card:hover { border-color: var(--border-gold); box-shadow: var(--shadow-md); }
+        .exhibit-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .exhibit-icon {
+            font-size: 1.6rem; background: var(--bg-section);
+            width: 44px; height: 44px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; border: 1.5px solid var(--border);
+        }
+        .exhibit-title { font-size: 0.8rem; font-weight: 700; color: var(--text-main); line-height: 1.3; }
+        .exhibit-era-tag {
+            font-size: 0.59rem; color: var(--primary-dark); font-weight: 600;
+            margin-top: 3px; background: var(--primary-subtle);
+            display: inline-block; padding: 2px 8px; border-radius: 10px;
+        }
+        .exhibit-desc { font-size: 0.7rem; color: var(--text-sub); line-height: 1.6; }
+
+        /* ── MUSEUM SHOP ── */
+        .museum-header { padding: 14px 16px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; background: var(--bg-sidebar-header); }
+        .museum-header-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; gap: 8px; }
+        .wallet-display { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+        .era-wallet-chip {
+            display: flex; align-items: center; gap: 5px;
+            background: #FDF8EC; border: 1px solid rgba(201,162,39,0.3);
+            padding: 3px 10px; border-radius: 20px;
+            font-size: 0.62rem; font-weight: 600;
+            color: var(--primary-dark); white-space: nowrap;
+        }
+        .museum-era-filter { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 2px; }
+        .era-filter-btn {
+            padding: 4px 12px; border-radius: 20px;
+            font-size: 0.63rem; font-weight: 600;
+            border: 1.5px solid var(--border);
+            background: white; cursor: pointer;
+            font-family: 'Prompt', sans-serif;
+            color: var(--text-muted); transition: all 0.15s;
+        }
+        .era-filter-btn:hover { background: var(--bg-section); color: var(--text-main); }
+        .era-filter-btn.active { background: var(--text-main); color: white; border-color: var(--text-main); }
+        .museum-nav-tabs { display: flex; border-bottom: 1px solid var(--border); background: white; flex-shrink: 0; }
+        .museum-nav-tab {
+            flex: 1; padding: 11px 8px;
+            font-size: 0.72rem; font-weight: 600;
+            border: none; border-bottom: 2.5px solid transparent;
+            background: transparent; cursor: pointer;
+            font-family: 'Prompt', sans-serif;
+            color: var(--text-muted); transition: all 0.15s;
+        }
+        .museum-nav-tab:hover { color: var(--text-main); background: var(--bg-section); }
+        .museum-nav-tab.active { color: var(--primary-dark); border-bottom-color: var(--primary); background: white; }
+        .museum-content { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; background: var(--bg-section); }
+        .artifact-card {
+            background: white; border-radius: 14px; padding: 13px;
+            box-shadow: var(--shadow-sm); transition: all 0.2s;
+            border: 1.5px solid var(--border);
+        }
+        .artifact-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+        .artifact-card.owned { background: #FDFAF4; }
+        .rarity-bar { height: 3px; border-radius: 2px; margin-bottom: 10px; }
+        .rarity-bar.common    { background: #b2bec3; }
+        .rarity-bar.uncommon  { background: #00b894; }
+        .rarity-bar.rare      { background: #0984e3; }
+        .rarity-bar.legendary { background: linear-gradient(90deg, var(--primary-dark), var(--primary), var(--primary-light)); }
+        .rarity-bar.mythic    { background: linear-gradient(90deg, #6c5ce7, #a29bfe, #fd79a8); }
+        .artifact-card.rarity-legendary { border-color: rgba(201,162,39,0.5); }
+        .artifact-card.rarity-mythic    { border-color: rgba(108,92,231,0.5); }
+        .artifact-card.rarity-rare      { border-color: rgba(9,132,227,0.4); }
+        .artifact-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .artifact-icon {
+            font-size: 1.6rem; background: var(--bg-section);
+            width: 44px; height: 44px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; border: 1.5px solid var(--border);
+        }
+        .artifact-info { flex: 1; min-width: 0; }
+        .artifact-name { font-size: 0.8rem; font-weight: 700; color: var(--text-main); line-height: 1.3; }
+        .artifact-era-tag {
+            font-size: 0.57rem; font-weight: 600; color: var(--primary-dark);
+            background: var(--primary-subtle); border: 1px solid var(--border-gold);
+            display: inline-block; padding: 2px 7px; border-radius: 10px; margin-top: 3px;
+        }
+        .rarity-tag {
+            font-size: 0.55rem; font-weight: 700; padding: 1px 7px; border-radius: 10px;
+            display: inline-block; margin-left: 4px; vertical-align: middle;
+        }
+        .rarity-tag.common    { background: #f0f0f0; color: #636e72; }
+        .rarity-tag.uncommon  { background: #d4edda; color: #155724; }
+        .rarity-tag.rare      { background: #cce5ff; color: #004085; }
+        .rarity-tag.legendary { background: #FDF8EC; color: var(--primary-dark); border: 1px solid rgba(201,162,39,0.3); }
+        .rarity-tag.mythic    { background: #f3f0ff; color: #6c5ce7; }
+        .artifact-desc { font-size: 0.69rem; color: var(--text-sub); line-height: 1.55; margin-bottom: 10px; }
+        .artifact-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .artifact-price { display: flex; align-items: center; gap: 4px; font-size: 0.72rem; font-weight: 700; color: var(--text-main); flex-wrap: wrap; }
+        .price-currency { font-size: 0.6rem; color: var(--text-muted); font-weight: 400; }
+        .buy-btn {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white; border: none; padding: 7px 16px; border-radius: 10px;
+            font-size: 0.68rem; font-weight: 700; cursor: pointer;
+            font-family: 'Prompt', sans-serif;
+            transition: all 0.18s; box-shadow: 0 3px 12px rgba(201,162,39,0.3);
+            white-space: nowrap; flex-shrink: 0;
+        }
+        .buy-btn:hover { box-shadow: 0 5px 20px rgba(201,162,39,0.45); transform: translateY(-1px); }
+        .buy-btn.insufficient { background: #dfe6e9; color: #b2bec3; box-shadow: none; cursor: not-allowed; }
+        .buy-btn.insufficient:hover { transform: none; box-shadow: none; }
+        .owned-badge {
+            display: flex; align-items: center; gap: 4px;
+            font-size: 0.65rem; font-weight: 700; color: #1E8A5E;
+            background: #EDFAF4; border: 1px solid #ACDEC6;
+            padding: 6px 12px; border-radius: 10px; flex-shrink: 0;
+        }
+        .collection-header { font-size: 0.63rem; color: var(--text-muted); padding: 2px 4px 6px; }
+        .collection-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .collection-item {
+            background: white; border-radius: 12px; padding: 10px 8px;
+            border: 1.5px solid var(--border); text-align: center;
+            box-shadow: var(--shadow-sm); transition: all 0.15s; cursor: default;
+        }
+        .collection-item:hover { border-color: var(--border-gold); box-shadow: var(--shadow-md); }
+        .collection-item.rarity-legendary { border-color: rgba(201,162,39,0.4); background: #FDFAF6; }
+        .collection-item.rarity-mythic    { border-color: rgba(108,92,231,0.4); background: #faf9ff; }
+        .collection-item.rarity-rare      { border-color: rgba(9,132,227,0.35); }
+        .ci-icon { font-size: 1.6rem; display: block; margin-bottom: 5px; }
+        .ci-name { font-size: 0.57rem; color: var(--text-main); font-weight: 600; line-height: 1.3; }
+        .ci-era  { font-size: 0.52rem; color: var(--text-muted); margin-top: 2px; }
+
+        /* ── SHOWCASE ── */
+        .showcase-progress {
+            display: flex; align-items: center; gap: 12px;
+            padding: 11px 14px; background: white;
+            border: 1.5px solid var(--border); border-radius: 14px;
+            box-shadow: var(--shadow-sm);
+        }
+        .showcase-count-block { text-align: center; flex-shrink: 0; }
+        .showcase-count { font-size: 1.35rem; font-weight: 700; color: var(--primary-dark); line-height: 1; }
+        .showcase-count-sub { font-size: 0.53rem; color: var(--text-muted); margin-top: 2px; }
+        .showcase-prog-wrap { flex: 1; }
+        .showcase-prog-label { font-size: 0.6rem; color: var(--text-muted); margin-bottom: 6px; display: flex; justify-content: space-between; }
+        .showcase-prog-track { background: var(--border); border-radius: 10px; height: 7px; overflow: hidden; }
+        .showcase-prog-fill { height: 100%; border-radius: 10px; background: linear-gradient(90deg, var(--primary-dark), var(--primary), var(--primary-light)); transition: width 0.7s ease; min-width: 4px; }
+        .showcase-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; }
+        .showcase-case {
+            background: linear-gradient(160deg, #1C2333 0%, #2A3347 65%, #1C2333 100%);
+            border-radius: 16px; padding: 14px 10px 0;
+            border: 1.5px solid rgba(201,162,39,0.4);
+            text-align: center; overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.06);
+            transition: all 0.22s; position: relative;
+        }
+        .showcase-case:hover { transform: translateY(-3px); box-shadow: 0 8px 32px rgba(0,0,0,0.35), 0 0 0 1px rgba(201,162,39,0.45); }
+        .showcase-case.rarity-mythic { border-color: rgba(108,92,231,0.65); background: linear-gradient(160deg, #1a1430 0%, #2d1f55 65%, #1a1430 100%); }
+        .showcase-case.rarity-rare   { border-color: rgba(9,132,227,0.55); }
+        .showcase-spotlight {
+            position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+            width: 80px; height: 80px;
+            background: radial-gradient(circle, rgba(255,220,90,0.15) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        .showcase-case.rarity-mythic .showcase-spotlight { background: radial-gradient(circle, rgba(160,100,255,0.2) 0%, transparent 70%); }
+        .showcase-icon {
+            font-size: 2.5rem; display: block; margin: 4px 0 9px;
+            filter: drop-shadow(0 2px 10px rgba(201,162,39,0.4));
+        }
+        .showcase-case.rarity-mythic .showcase-icon { filter: drop-shadow(0 2px 16px rgba(160,100,255,0.55)); }
+        .showcase-name { font-size: 0.65rem; font-weight: 700; color: #F0ECD8; line-height: 1.3; padding: 0 4px 8px; }
+        .showcase-plate {
+            background: rgba(201,162,39,0.1);
+            border-top: 1.5px solid rgba(201,162,39,0.22);
+            padding: 5px 8px 7px; margin: 0 -10px;
+            border-radius: 0 0 14px 14px;
+        }
+        .showcase-case.rarity-mythic .showcase-plate { background: rgba(108,92,231,0.12); border-color: rgba(108,92,231,0.25); }
+        .showcase-era-label { font-size: 0.53rem; color: rgba(201,162,39,0.85); font-weight: 600; }
+        .showcase-case.rarity-mythic .showcase-era-label { color: rgba(160,100,255,0.9); }
+        /* Locked (not yet collected) */
+        .showcase-case.locked {
+            background: linear-gradient(160deg, #f5f2ea 0%, #ede8dc 100%);
+            border-color: var(--border); box-shadow: none; opacity: 0.55;
+        }
+        .showcase-case.locked:hover { transform: none; box-shadow: none; }
+        .showcase-case.locked .showcase-spotlight { display: none; }
+        .showcase-case.locked .showcase-icon { filter: grayscale(1); opacity: 0.25; font-size: 1.8rem; margin-top: 8px; }
+        .showcase-case.locked .showcase-name { color: var(--text-muted); }
+        .showcase-case.locked .showcase-plate { background: rgba(0,0,0,0.04); border-color: var(--border); }
+        .showcase-case.locked .showcase-era-label { color: var(--text-muted); }
+        .locked-label { font-size: 0.56rem; color: var(--text-muted); margin-bottom: 6px; }
+
+        /* ── CERTIFICATE ── */
+        .cert-card {
+            background: linear-gradient(160deg, #FDFAF0 0%, #FDF4D0 50%, #FDFAF0 100%);
+            border: 2px solid rgba(201,162,39,0.5);
+            border-radius: 16px; padding: 20px 16px;
+            text-align: center; position: relative; overflow: hidden;
+            box-shadow: 0 4px 24px rgba(201,162,39,0.14), inset 0 1px 0 rgba(255,255,255,0.8);
+        }
+        .cert-card::before {
+            content: ''; position: absolute; inset: 7px;
+            border: 1px dashed rgba(201,162,39,0.3); border-radius: 11px;
+            pointer-events: none;
+        }
+        .cert-watermark {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 7rem; opacity: 0.04; pointer-events: none; user-select: none;
+        }
+        .cert-header-label {
+            font-size: 0.53rem; font-weight: 700; letter-spacing: 0.14em;
+            text-transform: uppercase; color: var(--primary-dark); margin-bottom: 5px;
+        }
+        .cert-title-main {
+            font-size: 1.05rem; font-weight: 700; color: var(--text-main);
+            font-family: 'Cinzel', 'Prompt', serif; line-height: 1.2;
+        }
+        .cert-divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(201,162,39,0.45), transparent);
+            margin: 10px 0;
+        }
+        .cert-username {
+            font-size: 1.3rem; font-weight: 700; color: var(--primary-dark);
+            font-family: 'Cinzel', 'Prompt', serif; margin: 6px 0 4px;
+        }
+        .cert-level-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+            color: white; padding: 5px 18px; border-radius: 20px;
+            font-size: 0.71rem; font-weight: 700; margin: 6px 0;
+            box-shadow: 0 3px 12px rgba(201,162,39,0.35);
+        }
+        .cert-stats-row {
+            display: flex; justify-content: center; gap: 18px; margin: 8px 0;
+        }
+        .cert-stat { text-align: center; }
+        .cert-stat .cv { font-size: 1.05rem; font-weight: 700; color: var(--primary-dark); }
+        .cert-stat .cl { font-size: 0.53rem; color: var(--text-muted); margin-top: 2px; }
+        .cert-seal {
+            width: 46px; height: 46px;
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 1.3rem; margin: 10px auto 4px;
+            box-shadow: 0 4px 16px rgba(201,162,39,0.4); border: 3px solid rgba(255,255,255,0.7);
+        }
+        .cert-issued { font-size: 0.56rem; color: var(--text-muted); margin-top: 3px; }
+
+        /* ── CHAT HISTORY DETAIL ── */
+        .history-item { cursor: pointer; }
+        .history-messages-preview {
+            padding: 8px 12px 10px;
+            background: var(--bg-section);
+            border-radius: 0 0 12px 12px;
+            border: 1.5px solid var(--border-gold);
+            border-top: none;
+            display: none;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .history-messages-preview.open { display: flex; }
+        .hmp-msg { font-size: 0.66rem; color: var(--text-sub); line-height: 1.5; }
+        .hmp-msg.user-msg { color: var(--text-main); font-weight: 500; }
+        .hmp-empty { font-size: 0.63rem; color: var(--text-muted); font-style: italic; text-align: center; padding: 4px 0; }
+    </style>
+</head>
+<body>
+
+    <!-- ── TOP NAVBAR ── -->
+    <nav class="top-navbar">
+        <div class="logo-area">
+            <div class="logo-icon"><i data-lucide="compass"></i></div>
+            <div class="logo-text">
+                <h1>HisTalk</h1>
+            </div>
+        </div>
+        <div class="nav-tabs" style="margin-left:auto;">
+            <button class="nav-tab active" id="nav-chat" onclick="showPage('chat')">
+                <i data-lucide="message-circle" style="width:15px;height:15px;"></i>
+                สนทนา
+            </button>
+            <button class="nav-tab" id="nav-museum" onclick="showPage('museum')">
+                <i data-lucide="landmark" style="width:15px;height:15px;"></i>
+                พิพิธภัณฑ์
+            </button>
+            <button class="nav-tab" id="nav-profile" onclick="showPage('profile')">
+                <i data-lucide="user" style="width:15px;height:15px;"></i>
+                โปรไฟล์
+            </button>
+        </div>
+    </nav>
+
+    <!-- FULL-SCREEN MAP BACKGROUND -->
+    <div id="leaflet-map"></div>
+
+    <!-- ── ERA FLOATING INFO BOX (left of map) ── -->
+    <div class="era-float-wrap" id="era-float-wrap">
+        <!-- Always-visible icon toggle -->
+        <button class="efb-toggle-btn active" id="efb-toggle-btn" onclick="toggleEraBox()" title="ข้อมูลยุคสมัย" style="display:none;">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <div class="efb-era-badge" id="efb-era-badge" style="background:#8B1A1A;"></div>
+        </button>
+        <!-- Collapsible info card -->
+        <div class="era-float-box" id="era-float-box">
+            <div class="efb-header">
+                <div class="efb-era-dot" id="efb-dot" style="background:#8B1A1A;"></div>
+                <span class="efb-era-name" id="efb-era-name">ยุคอยุธยา</span>
+                <button class="efb-close-btn" onclick="toggleEraBox()" title="ปิด">
+                    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="1" y1="1" x2="13" y2="13"/><line x1="13" y1="1" x2="1" y2="13"/></svg>
+                </button>
+            </div>
+            <div class="efb-body">
+                <!-- Section 1: Era overview -->
+                <div class="efb-section">
+                    <div class="efb-section-label">ภาพรวมยุค</div>
+                    <div class="efb-row">
+                        <span class="efb-label">ช่วงเวลา</span>
+                        <span class="efb-value" id="efb-period">พ.ศ. 1893 – 2310</span>
+                    </div>
+                    <div class="efb-row">
+                        <span class="efb-label">ราชธานี</span>
+                        <span class="efb-value" id="efb-capital">กรุงศรีอยุธยา</span>
+                    </div>
+                    <div class="efb-row">
+                        <span class="efb-label">ระยะเวลา</span>
+                        <span class="efb-value" id="efb-duration">417 ปี</span>
+                    </div>
+                    <div id="efb-era-highlight"></div>
+                </div>
+                <!-- Section 2: Year-specific -->
+                <div class="efb-section" id="efb-year-section">
+                    <div class="efb-section-label">
+                        ณ ปีที่เลือก
+                        <span class="efb-year-tag" id="efb-year-tag">พ.ศ. —</span>
+                    </div>
+                    <div id="efb-king-area"></div>
+                    <div id="efb-events-area"></div>
+                </div>
+                <!-- Section 3: World comparison -->
+                <div class="efb-section">
+                    <div class="efb-section-label" style="color:#2B6CB0;">🌍 โลกในช่วงเดียวกัน</div>
+                    <div id="efb-world-area"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar drag-resize handle -->
+    <div class="sidebar-resize-handle" id="sidebar-resize-handle"></div>
+
+    <!-- ── RIGHT SIDEBAR ── -->
+    <aside class="right-sidebar">
+
+        <!-- STATE 1: Character Selection -->
+        <div id="char-selection-view" class="char-selection-view">
+            <div class="selection-header">
+                <p class="selection-title">เลือกบุคคลที่จะสนทนา</p>
+                <p class="selection-subtitle">ยุค <span id="selection-era-name">อยุธยา</span> · เลื่อนแถบเวลาเพื่อเปลี่ยนยุค</p>
+            </div>
+            <div class="char-cards-grid" id="char-cards-grid"></div>
+        </div>
+
+        <!-- STATE 2: Chat -->
+        <div id="chat-panel" class="chat-panel" style="display:none;">
+            <div class="sidebar-profile">
+                <div class="profile-avatar" id="header-avatar">⚔️</div>
+                <div class="profile-name">
+                    <h3 id="header-name">สมเด็จพระนเรศวรมหาราช</h3>
+                    <p id="header-subtitle">สวมบทบาทโดย HisTalk AI • ยุคอยุธยา</p>
+                </div>
+                <button class="back-btn" onclick="showCharacterSelection()">← เปลี่ยน</button>
+                <button class="call-toggle-btn" id="call-btn" onclick="toggleCallMode()">
+                    <i data-lucide="phone" style="width:13px;height:13px;"></i>
+                    <span id="call-btn-text">โทร</span>
+                </button>
+            </div>
+
+            <div class="sidebar-chat" id="interaction-body">
+                <div class="chat-container" id="chat-view"></div>
+                <div class="call-container" id="call-view">
+                    <div class="avatar-ring-container">
+                        <div class="call-avatar" id="call-avatar-emoji">⚔️</div>
+                        <div class="pulse-ring"></div>
+                    </div>
+                    <h4 id="call-target-name">สมเด็จพระนเรศวรมหาราช</h4>
+                    <div class="call-status-text"><i data-lucide="mic" style="width:12px;height:12px;"></i> ระบบกำลังฟังเสียงของคุณ...</div>
+                    <div class="voice-subtitle">"เออฮึ... สหายต่างเวลา มีเรื่องเร่งด่วนอันใดพูดมาเถิด ข้าฟังอยู่"</div>
+                </div>
+            </div>
+
+            <div class="sidebar-input" id="panel-footer">
+                <div class="input-wrapper">
+                    <input type="text" id="chat-input" placeholder="พิมพ์คำถาม..." onkeydown="if(event.key==='Enter') sendMessage()">
+                    <button class="send-btn" onclick="sendMessage()">
+                        <span>ส่ง</span><i data-lucide="send" style="width:13px;height:13px;"></i>
+                    </button>
+                </div>
+                <div class="sidebar-disclaimer">บทบาทสมมติโดย AI เพื่อการศึกษา</div>
+            </div>
+        </div>
+
+        <!-- STATE 3: Museum Page -->
+        <div id="museum-page" class="museum-page">
+            <div class="museum-header">
+                <div class="museum-header-top">
+                    <div>
+                        <p class="selection-title">ตลาดโบราณวัตถุ</p>
+                        <p class="selection-subtitle">รวบรวมสมบัติล้ำค่าจากทุกยุคสมัย</p>
+                    </div>
+                    <div class="wallet-display" id="museum-wallet"></div>
+                </div>
+                <div class="museum-era-filter" id="museum-era-filter"></div>
+            </div>
+            <div class="museum-nav-tabs">
+                <button class="museum-nav-tab active" id="m-tab-collection" onclick="switchMuseumTab('collection')">🏛️ โชว์เคส</button>
+                <button class="museum-nav-tab" id="m-tab-shop" onclick="switchMuseumTab('shop')">🏪 ตลาด</button>
+            </div>
+            <div class="museum-content" id="museum-content"></div>
+        </div>
+
+        <!-- STATE 4: User Profile Page -->
+        <div id="user-page" class="user-page">
+            <div class="up-header">
+                <div class="up-avatar-row">
+                    <div class="up-avatar" id="up-avatar">🎓</div>
+                    <div>
+                        <div class="up-name" id="up-name">นักสำรวจ</div>
+                        <div class="up-level-label" id="up-level-label">ระดับ 1 · ผู้เริ่มต้น</div>
+                    </div>
+                </div>
+                <div class="xp-bar-wrap">
+                    <div class="xp-labels">
+                        <span>ประสบการณ์</span>
+                        <span id="up-xp-label">0 / 100 XP</span>
+                    </div>
+                    <div class="xp-track">
+                        <div class="xp-fill" id="up-xp-fill" style="width:0%"></div>
+                    </div>
+                </div>
+                <div class="up-stats">
+                    <div class="up-stat">
+                        <div class="sv" id="up-stat-msgs">0</div>
+                        <div class="sl">ข้อความ</div>
+                    </div>
+                    <div class="up-stat">
+                        <div class="sv" id="up-stat-eras">0</div>
+                        <div class="sl">ยุคที่สำรวจ</div>
+                    </div>
+                    <div class="up-stat">
+                        <div class="sv" id="up-stat-chats">0</div>
+                        <div class="sl">การสนทนา</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="up-body">
+                <!-- Certificate -->
+                <div>
+                    <div class="up-section-title">ใบรับรอง</div>
+                    <div id="cert-section"></div>
+                </div>
+            
+                <!-- History -->
+                <div>
+                    <div class="up-section-title">ประวัติการสนทนา</div>
+                    <div class="history-list" id="history-list"></div>
+                </div>
+        </div>
+
+    </aside>
+
+    <!-- Achievement toast -->
+    <div class="achievement-toast" id="achievement-toast"></div>
+
+    <!-- ── BOTTOM TIMELINE BAR ── -->
+    <div class="timeline-bar">
+        <div class="timeline-top">
+            <div class="year-block">
+                <span class="yn-label">ปีที่เลือก</span>
+                <span class="yn-value" id="year-display">พ.ศ. 1893</span>
+                <span class="yn-ce" id="year-ce"> · ค.ศ. 1350</span>
+            </div>
+            <span class="era-pill" id="era-pill" style="background:#8B1A1A;">⚔️ ยุคอยุธยา</span>
+            <div class="era-quick-info" id="era-quick-info"></div>
+        </div>
+        <input type="range" min="1792" max="2568" value="1893" step="1" class="time-slider" id="era-range-slider" oninput="handleSliderChange(this.value)">
+        <div class="era-timeline-bar">
+            <div class="era-bar-seg" id="era-seg-sukho" style="flex:101;background:#8B6914;" onclick="jumpToYear(1835)" title="สุโขทัย">สุโขทัย</div>
+            <div class="era-bar-seg active" id="era-seg-ayu" style="flex:417;background:#8B1A1A;" onclick="jumpToYear(1893)" title="อยุธยา">อยุธยา</div>
+            <div class="era-bar-seg" id="era-seg-thon" style="flex:15;background:#4A1A7A;" onclick="jumpToYear(2310)" title="ธนบุรี"></div>
+            <div class="era-bar-seg" id="era-seg-ratana" style="flex:243;background:#1A4A8A;" onclick="jumpToYear(2325)" title="รัตนโกสินทร์">รัตนโกสินทร์</div>
+        </div>
+        <div class="era-timeline-labels">
+            <div class="era-tl-label" style="flex:101;">1792</div>
+            <div class="era-tl-label" style="flex:417;">1893</div>
+            <div class="era-tl-label" style="flex:15;"></div>
+            <div class="era-tl-label" style="flex:243;text-align:right;">2568</div>
+        </div>
+    </div>
+
+    <script>
+        // ========== LEAFLET MAP ==========
+        let leafletMap, kingdomLayer, markerGroup, legendControl, labelGroup;
+
+        // Modern Thailand boundary — used as a permanent geographic reference
+        const THAILAND_OUTLINE = [
+            [20.44, 99.88], [20.34, 100.09], [20.15, 100.35], [20.05, 100.65],
+            [19.88, 101.10], [19.48, 101.72], [18.98, 102.15], [18.48, 102.46],
+            [17.88, 102.69], [17.54, 103.06], [17.08, 103.44], [16.54, 104.72],
+            [16.08, 105.08], [15.52, 105.48], [14.85, 105.50], [14.35, 105.12],
+            [13.92, 105.14], [13.69, 103.52], [13.15, 103.18], [12.60, 102.57],
+            [11.67, 102.91], [11.22, 101.58], [10.50, 101.02], [9.80, 100.32],
+            [9.00, 100.07], [8.41, 99.97],  [7.70, 99.56],  [7.00, 100.06],
+            [6.48, 100.27], [5.92, 101.42], [5.67, 101.89],
+            // west coast northward
+            [6.25, 100.32], [6.82, 99.85],  [7.50, 99.25],  [8.00, 98.98],
+            [9.96, 98.64],  [10.58, 98.75], [11.08, 99.05], [11.50, 99.25],
+            [11.93, 99.55], [12.50, 99.50], [13.05, 99.52], [13.55, 99.32],
+            [14.04, 98.86], [15.31, 98.42], [16.72, 98.57], [17.49, 97.89],
+            [17.97, 97.65], [18.55, 97.56], [19.24, 97.95], [19.73, 98.64],
+            [20.07, 99.42], [20.44, 99.88]
+        ];
+
+        const eraMapData = {
+            sukho: {
+                center: [13.5, 100.5], zoom: 5,
+                name: 'ยุคสุโขทัย', period: 'พ.ศ. 1792–1981',
+                mainColor: '#8B6914',
+                kingdoms: [
+                  { name:'สุโขทัย', color:'#8B6914', fillColor:'#F0B429', fillOpacity:0.55, main:true, labelLat:16.7, labelLng:99.5,
+                    polygon:[[18.0,97.8],[18.0,98.5],[18.0,99.5],[18.0,100.5],[18.0,101.2],[17.5,101.5],[17.0,101.5],[16.5,101.0],[16.0,100.5],[15.5,100.0],[15.1,99.5],[15.0,99.0],[15.0,98.5],[15.3,98.2],[15.8,98.0],[16.5,97.9],[17.2,97.8],[18.0,97.8]] },
+                  { name:'ล้านนา', color:'#276749', fillColor:'#68D391', fillOpacity:0.5, labelLat:19.8, labelLng:99.2,
+                    polygon:[[21.5,99.0],[21.5,100.5],[21.0,101.5],[20.5,102.0],[20.0,102.0],[19.5,101.5],[19.2,101.0],[18.8,101.0],[18.5,100.5],[18.2,100.0],[18.0,100.5],[18.0,99.5],[18.0,98.5],[18.0,97.8],[18.3,97.5],[18.8,97.3],[19.5,97.4],[20.2,97.5],[21.0,98.0],[21.5,99.0]] },
+                  { name:'ละโว้', color:'#2C5282', fillColor:'#63B3ED', fillOpacity:0.5, labelLat:14.2, labelLng:101.5,
+                    polygon:[[15.0,100.5],[15.0,101.2],[15.0,102.5],[14.5,102.8],[14.0,103.0],[13.5,102.5],[13.0,102.0],[13.0,101.0],[13.0,100.3],[13.5,100.0],[14.0,100.0],[14.5,100.0],[15.0,100.5]] },
+                  { name:'สุพรรณภูมิ', color:'#553C9A', fillColor:'#B794F4', fillOpacity:0.5, labelLat:13.5, labelLng:98.8,
+                    polygon:[[15.0,99.5],[14.5,99.8],[14.0,99.5],[13.5,99.2],[13.0,99.0],[12.5,98.7],[12.0,98.3],[12.0,97.8],[12.5,97.7],[13.0,97.8],[13.5,98.0],[14.0,98.0],[14.5,98.2],[15.0,98.5],[15.0,99.5]] },
+                  { name:'ตามพรลิงค์', color:'#C05621', fillColor:'#F6AD55', fillOpacity:0.5, labelLat:9.5, labelLng:99.5,
+                    polygon:[[12.0,98.5],[12.0,99.2],[11.5,100.0],[11.0,100.5],[10.5,100.8],[10.0,100.5],[9.5,100.3],[9.0,100.2],[8.5,100.0],[8.0,99.5],[7.5,99.2],[7.5,98.8],[8.0,98.5],[8.5,98.3],[9.0,98.3],[9.5,98.4],[10.0,98.5],[10.5,98.6],[11.0,98.8],[11.5,98.8],[12.0,98.5]] },
+                  { name:'ลังกาสุกะ', color:'#B7791F', fillColor:'#FAF089', fillOpacity:0.55, labelLat:6.5, labelLng:101.0,
+                    polygon:[[7.5,100.2],[7.5,101.5],[7.0,102.0],[6.5,102.0],[6.0,101.5],[5.7,101.0],[5.7,100.3],[6.0,100.0],[6.5,99.8],[7.0,99.8],[7.5,100.2]] }
+                ],
+                cities: [
+                    { name: 'สุโขทัย ★ ราชธานี', lat: 17.01, lng: 99.82, capital: true },
+                    { name: 'ศรีสัชนาลัย', lat: 17.52, lng: 99.82, capital: false },
+                    { name: 'กำแพงเพชร', lat: 16.48, lng: 99.52, capital: false },
+                    { name: 'พิษณุโลก', lat: 16.83, lng: 100.27, capital: false },
+                    { name: 'เชียงใหม่ (ล้านนา)', lat: 18.79, lng: 98.98, capital: false }
+                ]
+            },
+            ayu: {
+                center: [12.5, 101.0], zoom: 5,
+                name: 'ยุคอยุธยา', period: 'พ.ศ. 1893–2310',
+                mainColor: '#8B1A1A',
+                kingdoms: [
+                  { name:'อยุธยา', color:'#8B1A1A', fillColor:'#FC8181', fillOpacity:0.42, main:true, labelLat:13.5, labelLng:100.5,
+                    polygon:[[18.0,97.8],[18.0,98.5],[18.0,100.0],[18.0,101.5],[18.0,102.5],[17.0,104.0],[16.0,104.8],[15.0,105.5],[14.5,104.0],[13.5,103.0],[13.0,102.0],[12.5,101.5],[12.0,101.0],[11.5,100.5],[10.5,100.0],[9.8,99.8],[9.0,99.5],[8.5,99.0],[8.0,99.0],[7.5,99.5],[7.0,100.0],[6.5,100.5],[5.9,101.5],[5.7,101.9],[6.2,100.3],[6.8,99.8],[7.5,99.2],[8.0,98.9],[9.96,98.64],[10.6,98.8],[11.2,99.0],[12.0,99.2],[13.0,99.2],[13.5,99.3],[14.0,98.8],[15.3,98.4],[16.7,98.5],[17.5,97.9],[18.0,97.8]] },
+                  { name:'ล้านนา', color:'#276749', fillColor:'#68D391', fillOpacity:0.55, labelLat:19.5, labelLng:99.2,
+                    polygon:[[21.5,99.0],[21.5,100.5],[21.0,101.5],[20.5,102.0],[20.0,102.0],[19.5,101.5],[19.0,101.5],[18.5,101.5],[18.0,101.5],[18.0,100.0],[18.0,98.5],[18.0,97.8],[18.3,97.5],[18.8,97.3],[19.5,97.4],[20.2,97.5],[21.0,98.0],[21.5,99.0]] },
+                  { name:'ล้านช้าง', color:'#285E61', fillColor:'#4FD1C5', fillOpacity:0.5, labelLat:18.0, labelLng:104.5,
+                    polygon:[[21.0,101.5],[21.0,104.5],[20.0,104.5],[19.0,105.0],[18.0,106.0],[17.0,107.0],[16.0,107.5],[15.0,108.0],[14.0,107.0],[13.5,106.5],[14.5,105.5],[15.0,105.5],[16.0,104.8],[17.0,104.0],[18.0,102.5],[18.5,101.5],[19.0,101.5],[19.5,101.5],[20.0,102.0],[20.5,102.0],[21.0,101.5]] }
+                ],
+                cities: [
+                    { name: 'กรุงศรีอยุธยา ★ ราชธานี', lat: 14.355, lng: 100.562, capital: true },
+                    { name: 'พิษณุโลก', lat: 16.83, lng: 100.27, capital: false },
+                    { name: 'เชียงใหม่', lat: 18.79, lng: 98.98, capital: false },
+                    { name: 'นครศรีธรรมราช', lat: 8.43,  lng: 99.96,  capital: false },
+                    { name: 'มะริด', lat: 12.42, lng: 98.61, capital: false },
+                    { name: 'สุพรรณบุรี', lat: 14.47, lng: 100.13, capital: false },
+                    { name: 'จันทบุรี', lat: 12.61, lng: 102.10, capital: false },
+                    { name: 'สงขลา', lat: 7.19,  lng: 100.59, capital: false }
+                ]
+            },
+            thon: {
+                center: [14.5, 101.5], zoom: 6,
+                name: 'ยุคธนบุรี', period: 'พ.ศ. 2310–2325',
+                mainColor: '#4A1A7A',
+                kingdoms: [
+                  { name:'ธนบุรี', color:'#4A1A7A', fillColor:'#B794F4', fillOpacity:0.45, main:true, labelLat:14.0, labelLng:100.5,
+                    polygon:[[19.00,99.00],[19.30,100.00],[18.90,101.20],[18.20,102.00],[17.50,103.00],[16.50,104.00],[15.50,103.80],[14.50,103.50],[13.50,102.80],[13.00,102.20],[12.50,101.50],[12.00,101.00],[11.50,100.50],[10.50,100.20],[9.50,99.90],[8.50,99.50],[8.00,99.20],[8.50,99.00],[9.50,98.70],[9.96,98.64],[10.60,98.80],[11.20,99.00],[11.80,99.10],[12.50,99.20],[13.00,99.30],[13.80,99.10],[14.50,98.70],[15.50,98.20],[16.20,97.90],[17.00,97.90],[17.80,98.10],[18.50,98.50],[19.00,99.00]] }
+                ],
+                cities: [
+                    { name: 'กรุงธนบุรี ★ ราชธานี', lat: 13.747, lng: 100.487, capital: true },
+                    { name: 'จันทบุรี', lat: 12.61, lng: 102.10, capital: false },
+                    { name: 'ตาก', lat: 16.88, lng: 99.12, capital: false },
+                    { name: 'นครราชสีมา', lat: 14.97, lng: 102.10, capital: false },
+                    { name: 'พิษณุโลก', lat: 16.83, lng: 100.27, capital: false }
+                ]
+            },
+            ratana: {
+                center: [15.0, 102.5], zoom: 5,
+                name: 'ยุครัตนโกสินทร์', period: 'พ.ศ. 2325–ปัจจุบัน',
+                mainColor: '#1A4A8A',
+                kingdoms: [
+                  { name:'สยาม / รัตนโกสินทร์', color:'#1A4A8A', fillColor:'#90CDF4', fillOpacity:0.42, main:true, labelLat:12.0, labelLng:100.5,
+                    polygon:[[18.0,97.8],[18.0,98.5],[18.0,100.0],[18.0,102.0],[17.5,103.0],[17.0,104.2],[16.0,104.8],[15.0,105.5],[14.5,104.0],[13.5,103.0],[13.0,102.0],[12.5,101.5],[12.0,101.0],[11.5,100.5],[10.5,100.0],[9.8,99.8],[9.0,99.5],[8.5,99.0],[8.0,99.0],[7.5,99.5],[7.0,100.0],[6.5,100.5],[5.9,101.5],[5.67,101.89],[6.25,100.32],[6.82,99.85],[7.5,99.25],[8.0,98.98],[9.96,98.64],[10.58,98.75],[11.5,99.25],[12.5,99.5],[13.55,99.32],[14.04,98.86],[15.31,98.42],[16.72,98.57],[17.49,97.89],[17.97,97.65],[18.0,97.8]] },
+                  { name:'นครเชียงใหม่', color:'#276749', fillColor:'#68D391', fillOpacity:0.55, labelLat:19.5, labelLng:99.2,
+                    polygon:[[21.5,99.0],[21.5,100.5],[21.0,101.5],[20.5,102.0],[20.0,102.0],[19.5,101.5],[19.0,101.5],[18.5,101.5],[18.0,101.5],[18.0,100.0],[18.0,98.5],[18.0,97.8],[18.3,97.5],[18.8,97.3],[19.5,97.4],[20.2,97.5],[21.0,98.0],[21.5,99.0]] },
+                  { name:'ล้านช้าง', color:'#285E61', fillColor:'#4FD1C5', fillOpacity:0.5, labelLat:18.0, labelLng:104.5,
+                    polygon:[[21.0,101.5],[21.0,104.5],[20.0,104.5],[19.0,105.0],[18.0,106.0],[17.0,107.0],[16.0,107.5],[15.0,108.0],[14.0,107.0],[13.5,106.5],[14.5,105.5],[15.0,105.5],[16.0,104.8],[17.0,104.2],[18.0,102.0],[18.5,101.5],[19.0,101.5],[19.5,101.5],[20.0,102.0],[20.5,102.0],[21.0,101.5]] },
+                  { name:'กัมพูชา', color:'#9B2335', fillColor:'#FEB2B2', fillOpacity:0.5, labelLat:12.0, labelLng:104.5,
+                    polygon:[[14.5,104.0],[14.5,107.5],[11.5,107.5],[10.5,106.5],[10.0,105.0],[10.5,103.5],[11.5,102.5],[13.0,102.5],[13.5,103.5],[14.5,104.0]] }
+                ],
+                cities: [
+                    { name: 'กรุงเทพมหานคร ★ ราชธานี', lat: 13.75, lng: 100.52, capital: true },
+                    { name: 'เชียงใหม่', lat: 18.79, lng: 98.98, capital: false },
+                    { name: 'นครราชสีมา', lat: 14.97, lng: 102.10, capital: false },
+                    { name: 'นครศรีธรรมราช', lat: 8.43, lng: 99.96, capital: false },
+                    { name: 'เวียงจันทน์', lat: 17.97, lng: 102.60, capital: false },
+                    { name: 'พนมเปญ', lat: 11.55, lng: 104.92, capital: false },
+                    { name: 'อุบลราชธานี', lat: 15.25, lng: 104.86, capital: false }
+                ]
+            }
+        };
+
+        function initMap() {
+            leafletMap = L.map('leaflet-map', {
+                center: [13.5, 101.5],
+                zoom: 6,
+                scrollWheelZoom: true,
+                attributionControl: false,
+                zoomControl: false
+            });
+
+            // CartoDB Voyager — clean cartographic style that lets the era overlays stand out
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                maxZoom: 14,
+                opacity: 0.88
+            }).addTo(leafletMap);
+
+            L.control.attribution({ prefix: false })
+                .addAttribution('© <a href="https://openstreetmap.org">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>')
+                .addTo(leafletMap);
+
+
+            updateMap('ayu');
+        }
+
+        function updateMap(eraId) {
+            if (!leafletMap) return;
+            const data = eraMapData[eraId];
+            if (!data) return;
+
+            if (legendControl) leafletMap.removeControl(legendControl);
+
+            const mainK = data.kingdoms.find(k => k.main) || data.kingdoms[0];
+
+
+            // Kingdom area labels
+
+            // Legend
+            legendControl = L.control({ position: 'bottomleft' });
+            legendControl.onAdd = () => {
+                const div = L.DomUtil.create('div', 'era-legend');
+                div.style.borderLeft = `4px solid ${mainK.color}`;
+                div.innerHTML = `<span style="color:${mainK.color};">■</span> ${data.name}<br><span style="font-size:0.62rem;color:#555;font-weight:400;">${data.period || ''}</span>`;
+                return div;
+            };
+            legendControl.addTo(leafletMap);
+
+            leafletMap.flyTo(data.center, data.zoom, { duration: 0.8 });
+        }
+
+        // ========== ERA INFO ==========
+        const eraInfo = {
+            sukho: {
+                period: 'พ.ศ. 1792 – 1981',
+                capital: 'เมืองสุโขทัย',
+                duration: '189 ปี',
+                highlights: [
+                    'ยุคทองแห่งการปกครองแบบ "พ่อปกครองลูก" มีกระดิ่งให้ราษฎรสั่นขอความเป็นธรรมได้',
+                    'พ่อขุนรามคำแหงมหาราชทรงประดิษฐ์อักษรไทย เมื่อ พ.ศ. 1826',
+                    'ศูนย์กลางพุทธศาสนานิกายเถรวาทและงานช่างศิลป์ระดับสูง',
+                    'การค้าเสรี ไม่เก็บภาษีผ่านด่าน ส่งเสริมพ่อค้าจากทั่วภูมิภาค'
+                ]
+            },
+            ayu: {
+                period: 'พ.ศ. 1893 – 2310',
+                capital: 'กรุงศรีอยุธยา',
+                duration: '417 ปี',
+                highlights: [
+                    'อาณาจักรที่ยิ่งใหญ่นานที่สุด มีพระมหากษัตริย์ 33 พระองค์ใน 5 ราชวงศ์',
+                    'ศูนย์กลางการค้านานาชาติในเอเชียตะวันออกเฉียงใต้ มีชาวต่างชาติกว่า 40 ชาติพำนัก',
+                    'รบชนะพม่าในยุทธหัตถีโดยสมเด็จพระนเรศวรมหาราช พ.ศ. 2135',
+                    'เสียกรุงครั้งที่ 2 แก่พม่า พ.ศ. 2310 หลังถูกล้อม 14 เดือน'
+                ]
+            },
+            thon: {
+                period: 'พ.ศ. 2310 – 2325',
+                capital: 'กรุงธนบุรี',
+                duration: '15 ปี',
+                highlights: [
+                    'สมเด็จพระเจ้าตากสินมหาราชทรงกอบกู้เอกราชหลังเสียกรุงครั้งที่ 2 ในเวลาเพียง 7 เดือน',
+                    'รวมแผ่นดินที่แตกแยกเป็น 5 ก๊กกลับมาเป็นปึกแผ่นอีกครั้ง',
+                    'ขับไล่กองทัพพม่าออกจากดินแดนไทยได้สำเร็จหลายครั้ง',
+                    'ตั้งราชธานีฝั่งตะวันตกของแม่น้ำเจ้าพระยา ใกล้ปากอ่าว สะดวกรับมือศึก'
+                ]
+            },
+            ratana: {
+                period: 'พ.ศ. 2325 – ปัจจุบัน',
+                capital: 'กรุงเทพมหานคร',
+                duration: '243 ปี+',
+                highlights: [
+                    'พระบาทสมเด็จพระพุทธยอดฟ้าจุฬาโลก (ร.1) ทรงสถาปนาราชวงศ์จักรี',
+                    'รัชกาลที่ 5 ทรงปฏิรูปประเทศ ยกเลิกทาส และรักษาเอกราชท่ามกลางลัทธิล่าอาณานิคม',
+                    'กรุงเทพฯ เติบโตเป็นหนึ่งในเมืองสำคัญของเอเชียตะวันออกเฉียงใต้',
+                    'อาณาจักรที่ยังคงสืบทอดถึงปัจจุบัน ปกครองโดยราชวงศ์จักรีมาจนถึงรัชกาลที่ 10'
+                ]
+            }
+        };
+
+        // ========== HISTORICAL EVENTS BY YEAR ==========
+        const historicalEvents = [
+            // ── สุโขทัย ──
+            { year_be:1800, era:'sukho', emoji:'🏛️', title:'ก่อตั้งอาณาจักรสุโขทัย',         desc:'พ่อขุนศรีอินทราทิตย์ประกาศอิสรภาพจากขอม สถาปนาสุโขทัยเป็นอาณาจักรอิสระแห่งแรกของไทย' },
+            { year_be:1809, era:'sukho', emoji:'🛕', title:'สร้างวัดมหาธาตุสุโขทัย',          desc:'ศูนย์กลางพุทธศาสนาแห่งอาณาจักร บรรจุพระบรมสารีริกธาตุ เป็นสัญลักษณ์แห่งความศักดิ์สิทธิ์' },
+            { year_be:1822, era:'sukho', emoji:'🐘', title:'ขยายอาณาจักรสู่ลุ่มแม่น้ำโขง',   desc:'พ่อขุนรามคำแหงทรงขยายอาณาเขตไปถึงนครศรีธรรมราชและแหลมมลายู ด้วยการทูตและกำลัง' },
+            { year_be:1826, era:'sukho', emoji:'📝', title:'ประดิษฐ์อักษรไทย',                desc:'พ่อขุนรามคำแหงมหาราชทรงประดิษฐ์ลายสือไทย จารึกไว้ในศิลาจารึกหลักที่ 1 อันโด่งดัง' },
+            { year_be:1835, era:'sukho', emoji:'⚖️', title:'ระบบ "พ่อปกครองลูก"',             desc:'ระบบการปกครองที่เปิดให้ราษฎรสั่นกระดิ่งร้องทุกข์ถึงพระราชา ลดความเหลื่อมล้ำ' },
+            { year_be:1890, era:'sukho', emoji:'📚', title:'พระราชนิพนธ์ไตรภูมิกถา',          desc:'พระมหาธรรมราชาที่ 1 (ลิไท) ทรงพระราชนิพนธ์ไตรภูมิกถา วรรณคดีพุทธศาสนาชิ้นเอกของไทย' },
+            { year_be:1943, era:'sukho', emoji:'🔗', title:'สุโขทัยอยู่ใต้อำนาจอยุธยา',      desc:'สุโขทัยค่อยๆ สูญเสียอิสรภาพ กลายเป็นประเทศราชของกรุงศรีอยุธยาอย่างสมบูรณ์' },
+            { year_be:1981, era:'sukho', emoji:'🏚️', title:'สิ้นสุดอาณาจักรสุโขทัย',          desc:'สุโขทัยถูกผนวกรวมเข้ากับอยุธยาอย่างเป็นทางการ สิ้นสุดราชวงศ์พระร่วงที่ยิ่งใหญ่' },
+            // ── อยุธยา ──
+            { year_be:1893, era:'ayu',   emoji:'🏰', title:'ก่อตั้งกรุงศรีอยุธยา',            desc:'สมเด็จพระรามาธิบดีที่ 1 (อู่ทอง) ทรงสถาปนากรุงศรีอยุธยา ณ จุดบรรจบแม่น้ำสามสาย' },
+            { year_be:1914, era:'ayu',   emoji:'🐊', title:'ยกทัพตีพม่าครั้งแรก',             desc:'สมเด็จพระราเมศวรยกทัพไปตีเชียงใหม่ เริ่มต้นความขัดแย้งอยุธยา-พม่าที่ยาวนานหลายศตวรรษ' },
+            { year_be:1967, era:'ayu',   emoji:'🗺️', title:'ตีได้นครธม เขมร',                desc:'สมเด็จพระบรมราชาธิราชที่ 2 ยกทัพตีได้นครธม ปิดฉากยุครุ่งเรืองของจักรวรรดิเขมร' },
+            { year_be:1991, era:'ayu',   emoji:'⛩️', title:'สร้างวัดพระศรีสรรเพชญ์',          desc:'สมเด็จพระบรมไตรโลกนาถสร้างวัดหลวงประจำพระราชวัง ปฏิรูประบบศักดินาและการปกครอง' },
+            { year_be:2034, era:'ayu',   emoji:'⚓', title:'โปรตุเกสเข้ามาค้าขาย',            desc:'ชาวโปรตุเกสเป็นชาติตะวันตกชาติแรกที่เข้ามาติดต่ออยุธยา นำปืนไฟและปืนใหญ่มาขาย' },
+            { year_be:2060, era:'ayu',   emoji:'🕌', title:'ชาวมุสลิมตั้งถิ่นฐานในอยุธยา',   desc:'พ่อค้ามุสลิมจากอินเดีย เปอร์เซีย อาหรับ ตั้งชุมชนถาวรในอยุธยา เสริมความหลากหลาย' },
+            { year_be:2112, era:'ayu',   emoji:'😢', title:'เสียกรุงครั้งที่ 1',                desc:'พระเจ้าบุเรงนองยกทัพพม่า 5 แสนนาย ล้อมอยุธยา 7 เดือน อยุธยาตกเป็นเมืองขึ้นพม่า' },
+            { year_be:2127, era:'ayu',   emoji:'⚡', title:'ประกาศอิสรภาพจากพม่า',            desc:'สมเด็จพระนเรศวรมหาราชทรงประกาศอิสรภาพที่เมืองแครง ตัดสัมพันธ์กับพม่าอย่างเด็ดขาด' },
+            { year_be:2135, era:'ayu',   emoji:'🐘', title:'ยุทธหัตถีชนะพม่า',                desc:'สมเด็จพระนเรศวรทรงชนะยุทธหัตถีบนหลังช้างกับมังกะยอชวา กอบกู้เอกราชได้อย่างสมบูรณ์' },
+            { year_be:2153, era:'ayu',   emoji:'🛡️', title:'ขับไล่พม่าออกจากล้านนา',         desc:'สมเด็จพระนเรศวรยกทัพขับไล่กองทัพพม่าออกจากล้านนา ขยายอำนาจสู่ภาคเหนือ' },
+            { year_be:2199, era:'ayu',   emoji:'🌍', title:'ยุคทองการค้านานาชาติ',             desc:'สมเด็จพระนารายณ์เปิดสัมพันธ์ฝรั่งเศส มีชาวต่างชาติกว่า 40 ชาติอยู่ในอยุธยา' },
+            { year_be:2216, era:'ayu',   emoji:'🏰', title:'ฝรั่งเศสสร้างป้อมที่บางกอก',      desc:'พระเจ้าหลุยส์ที่ 14 ส่งกองทัพมาสร้างป้อมที่บางกอกและมะริด เพื่อผลประโยชน์การค้า' },
+            { year_be:2231, era:'ayu',   emoji:'🚪', title:'ขับไล่ฝรั่งเศสออกจากสยาม',        desc:'สมเด็จพระเพทราชาทรงยึดอำนาจขับไล่ทหารฝรั่งเศส ยุติอิทธิพลตะวันตกในสยาม' },
+            { year_be:2276, era:'ayu',   emoji:'📖', title:'รุ่งเรืองวรรณคดี',                desc:'ยุคบรมโกศ ทรงส่งเสริมพุทธศาสนาและวรรณคดี เป็นช่วงสงบสุขสุดท้ายก่อนเสียกรุง' },
+            { year_be:2310, era:'ayu',   emoji:'🔥', title:'เสียกรุงศรีอยุธยาครั้งที่ 2',     desc:'พม่าล้อมกรุง 14 เดือน กรุงแตก 7 เมษายน 2310 เมืองถูกเผาทำลาย ผู้คนถูกกวาดต้อน' },
+            // ── ธนบุรี ──
+            { year_be:2310, era:'thon',  emoji:'⚔️', title:'กอบกู้เอกราช',                    desc:'ตากสินมหาราชรวบรวมไพร่พลจากจันทบุรี กอบกู้เอกราชได้ภายใน 7 เดือนหลังเสียกรุง' },
+            { year_be:2312, era:'thon',  emoji:'🏙️', title:'สถาปนากรุงธนบุรี',               desc:'ทรงย้ายเมืองหลวงมาที่ธนบุรี ฝั่งตะวันตกของแม่น้ำเจ้าพระยา ป้องกันง่าย สะดวกค้าขาย' },
+            { year_be:2314, era:'thon',  emoji:'🛡️', title:'ขับไล่พม่าที่บางแก้ว',           desc:'ทรงนำทัพขับไล่กองทัพพม่าที่บางแก้ว นครศรีธรรมราช ได้รับชัยชนะอย่างเด็ดขาด' },
+            { year_be:2317, era:'thon',  emoji:'🤝', title:'รวมแผ่นดิน 5 ก๊ก',                desc:'สมเด็จพระเจ้าตากสินทรงรวบรวมแผ่นดินที่แตกแยกเป็น 5 ก๊กให้เป็นปึกแผ่นอีกครั้ง' },
+            { year_be:2321, era:'thon',  emoji:'💎', title:'อัญเชิญพระแก้วมรกต',              desc:'กองทัพสยามตีได้เวียงจันทน์ อัญเชิญพระแก้วมรกตและพระบางกลับมาสู่สยาม' },
+            // ── รัตนโกสินทร์ ──
+            { year_be:2325, era:'ratana',emoji:'👑', title:'สถาปนากรุงรัตนโกสินทร์',           desc:'ร.1 สถาปนาราชวงศ์จักรี ย้ายเมืองหลวงฝั่งตะวันออก สร้างวัดพระแก้ว พระบรมมหาราชวัง' },
+            { year_be:2352, era:'ratana',emoji:'📜', title:'ชำระพระไตรปิฎก',                   desc:'ร.1 โปรดให้สังคายนาพระไตรปิฎกครั้งใหญ่ วางรากฐานพุทธศาสนาแห่งกรุงรัตนโกสินทร์' },
+            { year_be:2369, era:'ratana',emoji:'🏯', title:'สงครามเก้าทัพ',                    desc:'พม่ายกทัพ 9 ทัพ บุกสยาม ร.1 ทรงป้องกันได้สำเร็จทุกด้าน เป็นชัยชนะครั้งยิ่งใหญ่' },
+            { year_be:2394, era:'ratana',emoji:'🤝', title:'สนธิสัญญาเบาริง',                 desc:'ร.4 ทรงทำสนธิสัญญากับอังกฤษ เปิดการค้าเสรี เก็บภาษีร้อยละ 3 รักษาเอกราชจากการล่าอาณานิคม' },
+            { year_be:2411, era:'ratana',emoji:'🌟', title:'ร.5 ขึ้นครองราชย์',                desc:'พระบาทสมเด็จพระจุลจอมเกล้าฯ ทรงขึ้นครองราชย์ เริ่มยุคปฏิรูปใหญ่ที่สุดในประวัติศาสตร์ไทย' },
+            { year_be:2416, era:'ratana',emoji:'🕊️', title:'ประกาศเลิกทาสครั้งแรก',           desc:'ร.5 ทรงออกพระราชบัญญัติห้ามซื้อขายทาส ลูกทาสเกิดหลัง 2411 เป็นไทโดยกำเนิด' },
+            { year_be:2436, era:'ratana',emoji:'😔', title:'วิกฤตการณ์ ร.ศ. 112',             desc:'ฝรั่งเศสส่งเรือรบเข้าปากน้ำ บังคับสยามยกดินแดนฝั่งซ้ายแม่น้ำโขง เสียดินแดนครั้งใหญ่' },
+            { year_be:2440, era:'ratana',emoji:'✈️', title:'เสด็จประพาสยุโรปครั้งแรก',        desc:'ร.5 เสด็จเยือนยุโรป 9 ประเทศ เจรจาการทูต รักษาเอกราชสยามจากมหาอำนาจตะวันตก' },
+            { year_be:2448, era:'ratana',emoji:'🔓', title:'เลิกทาสอย่างสมบูรณ์',             desc:'ร.5 ประกาศเลิกทาสทั่วพระราชอาณาจักร ปลดแอกชาวสยามหลายแสนคน ไม่มีค่าไถ่' },
+            { year_be:2459, era:'ratana',emoji:'🎓', title:'ก่อตั้งจุฬาลงกรณ์มหาวิทยาลัย',    desc:'ร.6 สถาปนาจุฬาลงกรณ์มหาวิทยาลัย สถาบันอุดมศึกษาแห่งแรกของไทย เปิดยุคการศึกษาสมัยใหม่' },
+            { year_be:2460, era:'ratana',emoji:'🎖️', title:'ไทยส่งทหารร่วมสงครามโลกที่ 1',   desc:'ร.6 ทรงนำไทยเข้าร่วมสงครามโลกครั้งที่ 1 ฝ่ายสัมพันธมิตร ได้สิทธิแก้ไขสนธิสัญญาไม่เป็นธรรม' },
+            { year_be:2475, era:'ratana',emoji:'🏛️', title:'เปลี่ยนแปลงการปกครอง 2475',       desc:'คณะราษฎรปฏิวัติ 24 มิถุนายน เปลี่ยนเป็นราชาธิปไตยภายใต้รัฐธรรมนูญ ยุติสมบูรณาญาสิทธิราชย์' },
+            { year_be:2484, era:'ratana',emoji:'💣', title:'ญี่ปุ่นบุกสยาม',                  desc:'ญี่ปุ่นยกทัพบุกสยาม 8 ธ.ค. 2484 รัฐบาลจอมพล ป. ยินยอมให้ผ่าน ไทยเข้าสู่สงครามโลกที่ 2' },
+            { year_be:2516, era:'ratana',emoji:'✊', title:'เหตุการณ์ 14 ตุลาคม 2516',        desc:'นักศึกษาและประชาชนนับแสนคนลุกฮือขับไล่เผด็จการทหาร เป็นจุดเปลี่ยนประชาธิปไตยไทย' },
+            { year_be:2535, era:'ratana',emoji:'🕯️', title:'พฤษภาทมิฬ',                      desc:'ประชาชนต่อต้านการสืบอำนาจของ รสช. ถูกปราบปราม ร.9 ทรงเรียกคู่กรณีเข้าเฝ้า ยุติความรุนแรง' },
+        ];
+
+        const worldEvents = [
+            // CE 1249-1299 (BE 1792-1842)
+            { year_be:1793, country:'🇨🇳 จีน',       title:'จักรวรรดิมองโกลครองจีน',          desc:'กุบไลข่านสถาปนาราชวงศ์หยวน ครองดินแดนจากเกาหลีถึงเปอร์เซีย ใหญ่ที่สุดในประวัติศาสตร์' },
+            { year_be:1826, country:'🇮🇹 อิตาลี',    title:'มาร์โค โปโลเดินทางสู่จีน',         desc:'นักสำรวจชาวเวนิซออกเดินทางสู่ราชสำนักกุบไลข่าน บันทึกเส้นทางสายไหมและตะวันออก' },
+            // CE 1300-1399 (BE 1843-1942)
+            { year_be:1891, country:'🇪🇺 ยุโรป',     title:'กาฬโรคระบาดทั่วยุโรป',             desc:'โรคระบาดร้ายแรงที่สุดในประวัติศาสตร์ คร่าชีวิตชาวยุโรป 1 ใน 3 หรือราว 25 ล้านคน' },
+            { year_be:1939, country:'🇹🇷 ออตโตมัน', title:'จักรวรรดิออตโตมันรุ่งเรือง',        desc:'สุลต่านบาเยซิดที่ 1 ขยายอำนาจในบอลข่านและอานาโตเลีย เป็นคู่แข่งสำคัญในเอเชียไมเนอร์' },
+            // CE 1400-1499 (BE 1943-2042)
+            { year_be:1996, country:'🇹🇷 ออตโตมัน', title:'ออตโตมันตีกรุงคอนสแตนติโนเปิล',    desc:'สุลต่านเมห์เหม็ดที่ 2 ยึดกรุงคอนสแตนติโนเปิล สิ้นสุดจักรวรรดิไบแซนไทน์อายุ 1,000 ปี' },
+            { year_be:2035, country:'🌎 อเมริกา',    title:'โคลัมบัสค้นพบทวีปอเมริกา',         desc:'คริสโตเฟอร์ โคลัมบัสขึ้นบกที่หมู่เกาะคาริบเบียน เปิดยุคล่าอาณานิคมของยุโรปในโลกใหม่' },
+            { year_be:2041, country:'🇵🇹 โปรตุเกส',  title:'วาสโก ดา กามา ถึงอินเดีย',         desc:'เปิดเส้นทางเดินเรือรอบแหลมกู๊ดโฮปสู่อินเดีย เปลี่ยนเส้นทางการค้าโลกจากบกเป็นทะเล' },
+            // CE 1500-1599 (BE 2043-2142)
+            { year_be:2060, country:'🇩🇪 เยอรมนี',   title:'มาร์ติน ลูเทอร์ปฏิรูปศาสนา',      desc:'ลูเทอร์ประกาศ 95 ข้อโต้แย้งคริสตจักร จุดชนวนการปฏิรูปศาสนาโปรเตสแตนต์ทั่วยุโรป' },
+            { year_be:2064, country:'🇲🇽 เม็กซิโก',  title:'สเปนพิชิตจักรวรรดิแอซเทก',         desc:'เอร์นัน กอร์เตส พิชิตเตโนชทิตลัน ล้มจักรวรรดิแอซเทก นำทองคำมหาศาลสู่สเปน' },
+            { year_be:2131, country:'🇬🇧 อังกฤษ',    title:'สเปน Armada พ่ายแก่อังกฤษ',       desc:'กองเรือสเปน 130 ลำพ่ายต่ออังกฤษ เปลี่ยนดุลอำนาจทางทะเล อังกฤษก้าวสู่มหาอำนาจ' },
+            // CE 1600-1699 (BE 2143-2242)
+            { year_be:2146, country:'🇯🇵 ญี่ปุ่น',   title:'เริ่มยุคเอโดะ โทกุกาวะ',           desc:'โทกุกาวะ อิเอยาสุ รวมญี่ปุ่นสร้างโชกุนเอโดะ ปิดประเทศ 250 ปี เป็นยุครุ่งเรืองของซามูไร' },
+            { year_be:2187, country:'🇨🇳 จีน',       title:'ราชวงศ์ชิงก่อตั้ง',                desc:'ชาวแมนจูพิชิตราชวงศ์หมิง สถาปนาราชวงศ์ชิง ปกครองจีนจนถึง ค.ศ. 1912' },
+            { year_be:2224, country:'🇷🇺 รัสเซีย',   title:'พระเจ้าปีเตอร์มหาราชขึ้นครอง',     desc:'ทรงปฏิรูปรัสเซียให้ทันสมัย สร้างเซนต์ปีเตอร์สเบิร์ก นำรัสเซียสู่เวทีมหาอำนาจยุโรป' },
+            // CE 1700-1799 (BE 2243-2342)
+            { year_be:2294, country:'🇫🇷 ฝรั่งเศส',  title:'การปฏิวัติอุตสาหกรรมเริ่มต้น',    desc:'อังกฤษนำการปฏิวัติอุตสาหกรรม เครื่องจักรไอน้ำเปลี่ยนระบบการผลิต สังคมโลกพลิกโฉม' },
+            { year_be:2319, country:'🇺🇸 สหรัฐฯ',   title:'สหรัฐอเมริกาประกาศเอกราช',         desc:'13 อาณานิคมอังกฤษประกาศเอกราช 4 กรกฎาคม 1776 สถาปนาสาธารณรัฐประชาธิปไตยแห่งแรก' },
+            { year_be:2332, country:'🇫🇷 ฝรั่งเศส',  title:'การปฏิวัติฝรั่งเศส',               desc:'ประชาชนล้มล้างระบอบกษัตริย์ ประหารพระเจ้าหลุยส์ที่ 16 แนวคิดเสรีภาพ เสมอภาค แพร่กระจายทั่วโลก' },
+            // CE 1800-1899 (BE 2343-2442)
+            { year_be:2358, country:'🇧🇪 เบลเยียม',  title:'นโปเลียนพ่ายที่วอเตอร์ลู',         desc:'นโปเลียน โบนาปาร์ตพ่ายแพ้ครั้งสุดท้าย สิ้นสุดยุคนโปเลียน ยุโรปเข้าสู่ยุคสันติภาพ' },
+            { year_be:2382, country:'🇨🇳 จีน',       title:'สงครามฝิ่น จีน-อังกฤษ',            desc:'อังกฤษบังคับจีนเปิดท่าเรือและยกฮ่องกงให้ เริ่มยุค "ศตวรรษแห่งความอัปยศ" ของจีน' },
+            { year_be:2396, country:'🇯🇵 ญี่ปุ่น',   title:'สหรัฐฯ บังคับญี่ปุ่นเปิดประเทศ',  desc:'พลเรือเอกเพอร์รีนำเรือรบอเมริกันเข้าอ่าวโตเกียว บังคับญี่ปุ่นเปิดการค้า เริ่มยุคเมจิ' },
+            { year_be:2404, country:'🇺🇸 สหรัฐฯ',   title:'สงครามกลางเมืองอเมริกา',            desc:'สงครามระหว่างฝ่ายเหนือ-ใต้ เพื่อทาสและความเป็นอันหนึ่งอันเดียว ลินคอล์นประกาศเลิกทาส' },
+            { year_be:2412, country:'🌍 โลก',        title:'เปิดคลองสุเอซ',                   desc:'คลองสุเอซเชื่อมทะเลเมดิเตอร์เรเนียน-ทะเลแดง ย่นระยะทางเดินเรือยุโรป-เอเชียกว่าครึ่ง' },
+            { year_be:2428, country:'🌍 แอฟริกา',   title:'มหาอำนาจแบ่งแอฟริกา',              desc:'การประชุมเบอร์ลิน 14 ชาติยุโรปแบ่งทวีปแอฟริกา ลัทธิอาณานิคมถึงขีดสุด' },
+            // CE 1900-1999 (BE 2443-2542)
+            { year_be:2448, country:'🇷🇺 รัสเซีย',   title:'รัสเซียพ่ายแก่ญี่ปุ่น',             desc:'ญี่ปุ่นชนะสงครามรัสเซีย-ญี่ปุ่น ชาติเอเชียชนะมหาอำนาจตะวันตกครั้งแรก เขย่าโลก' },
+            { year_be:2457, country:'🌍 ยุโรป',      title:'สงครามโลกครั้งที่ 1 ปะทุ',          desc:'การลอบสังหารอาร์คดยุคออสเตรียจุดชนวน มหาอำนาจยุโรปทำสงครามกัน มีผู้เสียชีวิตกว่า 17 ล้าน' },
+            { year_be:2460, country:'🇷🇺 รัสเซีย',   title:'การปฏิวัติรัสเซีย',                desc:'เลนินและพรรคบอลเชวิคล้มล้างซาร์ สถาปนาสหภาพโซเวียต โลกแบ่งเป็นสองอุดมการณ์' },
+            { year_be:2472, country:'🇺🇸 สหรัฐฯ',   title:'วิกฤตเศรษฐกิจโลก Great Depression', desc:'ตลาดหุ้นวอลสตรีทล่มสลาย ลุกลามเป็นวิกฤตเศรษฐกิจโลก ว่างงานหลายสิบล้านคน' },
+            { year_be:2482, country:'🌍 โลก',        title:'สงครามโลกครั้งที่ 2 เริ่มต้น',       desc:'เยอรมนีบุกโปแลนด์ 1 ก.ย. 2482 อังกฤษ-ฝรั่งเศสประกาศสงคราม สงครามใหญ่ที่สุดในประวัติศาสตร์' },
+            { year_be:2488, country:'🌍 โลก',        title:'สงครามโลกครั้งที่ 2 สิ้นสุด',        desc:'ระเบิดปรมาณูที่ฮิโรชิมา-นางาซากิ ญี่ปุ่นยอมแพ้ สิ้นสุดสงครามที่คร่าชีวิตกว่า 70 ล้านคน' },
+            { year_be:2492, country:'🇨🇳 จีน',       title:'จีนกลายเป็นสาธารณรัฐประชาชน',       desc:'เหมา เจ๋อตง ประกาศสาธารณรัฐประชาชนจีน หลังสงครามกลางเมือง ก๊กมินตั๋งหนีไปไต้หวัน' },
+            { year_be:2512, country:'🌙 อวกาศ',      title:'มนุษย์ขึ้นดวงจันทร์ครั้งแรก',       desc:'นีล อาร์มสตรองก้าวแรกบนดวงจันทร์ 20 ก.ค. 2512 ยานอพอลโล 11 สำเร็จภารกิจประวัติศาสตร์' },
+            { year_be:2532, country:'🇩🇪 เยอรมนี',   title:'กำแพงเบอร์ลินพังทลาย',              desc:'กำแพงแบ่งเยอรมันตก-ออกพังลง สิ้นสุดสงครามเย็น โลกเข้าสู่ยุคโลกาภิวัตน์' },
+            { year_be:2544, country:'🇺🇸 สหรัฐฯ',   title:'เหตุการณ์ 9/11',                    desc:'ผู้ก่อการร้ายโจมตีนิวยอร์กและวอชิงตัน พลิกโฉมนโยบายต่างประเทศและความมั่นคงโลก' },
+        ];
+
+        // ========== ERA CURRENCY & ARTIFACTS ==========
+        const ERA_CURRENCY = {
+            sukho:  { name: 'เบี้ย',      symbol: '🐚', color: '#8B6914' },
+            ayu:    { name: 'เงินพดด้วง', symbol: '🪙', color: '#8B1A1A' },
+            thon:   { name: 'เหรียญธนบุรี', symbol: '💰', color: '#4A1A7A' },
+            ratana: { name: 'บาท',         symbol: '฿',  color: '#1A4A8A' },
+        };
+
+        const ARTIFACTS = [
+            { id:'art01', emoji:'🪨', name:'ศิลาจารึกหลักที่ 1',         era:'sukho',  eraName:'สุโขทัย',      year:'พ.ศ. 1826',
+              desc:'จารึกอักษรไทยครั้งแรกโดยพ่อขุนรามคำแหงมหาราช บันทึกวิถีชีวิต การปกครอง และศาสนา หลักฐานสำคัญที่สุดของอารยธรรมไทย',
+              price:200, rarity:'legendary' },
+            { id:'art02', emoji:'🏺', name:'เครื่องถ้วยสังคโลก',          era:'sukho',  eraName:'สุโขทัย',      year:'พ.ศ. 1800–1981',
+              desc:'เครื่องปั้นดินเผาเคลือบสีเขียวไข่กาจากเตาสุโขทัย งานหัตถศิลป์ชั้นสูงที่ส่งออกทั่วเอเชียตะวันออกเฉียงใต้',
+              price:80,  rarity:'common' },
+            { id:'art03', emoji:'🥁', name:'กลองมโหระทึก',                era:'sukho',  eraName:'สุโขทัย',      year:'พ.ศ. 1800–1900',
+              desc:'กลองสำริดโบราณใช้ในพิธีกรรมและเรียกฝน เป็นสัญลักษณ์แห่งอำนาจและศาสนาในเอเชียตะวันออกเฉียงใต้',
+              price:120, rarity:'uncommon' },
+            { id:'art04', emoji:'📿', name:'ตะกรุดยุคสุโขทัย',            era:'sukho',  eraName:'สุโขทัย',      year:'พ.ศ. 1800–1981',
+              desc:'เครื่องรางของขลังทำจากโลหะม้วนเขียนสูตรคาถา เชื่อว่าคุ้มกันแคล้วคลาดจากอันตราย',
+              price:60,  rarity:'common' },
+            { id:'art05', emoji:'⚔️', name:'ดาบคู่พระหัตถ์ พระนเรศวร',    era:'ayu',    eraName:'อยุธยา',       year:'พ.ศ. 2135',
+              desc:'อาวุธสัญลักษณ์แห่งศึกยุทธหัตถี สมเด็จพระนเรศวรทรงใช้บนหลังช้างชนะพม่า กอบกู้เอกราชให้แผ่นดินไทย',
+              price:400, rarity:'legendary' },
+            { id:'art06', emoji:'💎', name:'พระแก้วมรกต (จำลอง)',           era:'ayu',    eraName:'อยุธยา',       year:'พ.ศ. 1436',
+              desc:'จำลองพระพุทธรูปสำคัญที่สุดของไทย แกะสลักจากหยกเนื้อเดียว ต้นฉบับประดิษฐาน ณ วัดพระแก้ว',
+              price:350, rarity:'legendary' },
+            { id:'art07', emoji:'🏛️', name:'แบบจำลองวัดพระศรีสรรเพชญ์',   era:'ayu',    eraName:'อยุธยา',       year:'พ.ศ. 1991',
+              desc:'วัดหลวงประจำพระราชวังกรุงศรีอยุธยา มีเจดีย์ 3 องค์บรรจุพระบรมอัฐิกษัตริย์ 3 พระองค์',
+              price:180, rarity:'rare' },
+            { id:'art08', emoji:'🎭', name:'หน้ากากโขนราชสำนัก',           era:'ayu',    eraName:'อยุธยา',       year:'พ.ศ. 1893–2310',
+              desc:'หน้ากากโขนงานฝีมือชั้นสูง ทาทองประดับลวดลาย ใช้แสดงเรื่องรามเกียรติ์ ศิลปะมรดกโลก UNESCO',
+              price:150, rarity:'uncommon' },
+            { id:'art09', emoji:'🔫', name:'ปืนใหญ่นารายณ์สังหาร',         era:'ayu',    eraName:'อยุธยา',       year:'พ.ศ. 2034',
+              desc:'ปืนใหญ่สำริดที่ได้รับจากชาวโปรตุเกส เปลี่ยนยุทธวิธีการรบของอยุธยาสู่สมัยใหม่',
+              price:220, rarity:'rare' },
+            { id:'art10', emoji:'⚓', name:'สมอเรือสำเภาโปรตุเกส',          era:'ayu',    eraName:'อยุธยา',       year:'พ.ศ. 2034',
+              desc:'สมอเรือจากสำเภาพ่อค้าโปรตุเกสที่เข้ามาค้าขายกับอยุธยา นำสินค้าและเทคโนโลยีใหม่สู่สยาม',
+              price:100, rarity:'common' },
+            { id:'art11', emoji:'🏹', name:'ธนูของพระเจ้าตากสิน',           era:'thon',   eraName:'ธนบุรี',       year:'พ.ศ. 2310–2325',
+              desc:'อาวุธคู่กายของสมเด็จพระเจ้ากรุงธนบุรีในการกอบกู้เอกราช สัญลักษณ์แห่งความกล้าหาญ',
+              price:300, rarity:'rare' },
+            { id:'art12', emoji:'🏚️', name:'ชิ้นส่วนกำแพงเมืองธนบุรี',     era:'thon',   eraName:'ธนบุรี',       year:'พ.ศ. 2312',
+              desc:'ซากกำแพงเมืองหลวงธนบุรีที่พระเจ้าตากสินสร้างป้องกันศัตรู ณ ฝั่งตะวันตกแม่น้ำเจ้าพระยา',
+              price:120, rarity:'uncommon' },
+            { id:'art13', emoji:'🛶', name:'เรือพระที่นั่งสุพรรณหงส์',      era:'ratana', eraName:'รัตนโกสินทร์', year:'ร.6',
+              desc:'เรือพระราชพิธีที่งดงามที่สุดของไทย แกะสลักเป็นหงส์ทองคำ ใช้ในพระราชพิธีกระบวนพยุหยาตราทางชลมารค',
+              price:500, rarity:'legendary' },
+            { id:'art14', emoji:'📜', name:'ต้นฉบับพระอภัยมณี',             era:'ratana', eraName:'รัตนโกสินทร์', year:'ร.2–ร.4',
+              desc:'วรรณคดีเอกของสุนทรภู่บนสมุดข่อยลายมือ เล่าการผจญภัยของเจ้าชายผู้มีขลุ่ยวิเศษ',
+              price:250, rarity:'rare' },
+            { id:'art15', emoji:'👑', name:'พระมหาพิชัยมงกุฎ (จำลอง)',      era:'ratana', eraName:'รัตนโกสินทร์', year:'ร.1',
+              desc:'จำลองพระราชกกุธภัณฑ์สำคัญที่สุด ใช้ในพระราชพิธีบรมราชาภิเษก ประดับเพชรและอัญมณีนับพัน',
+              price:800, rarity:'mythic' },
+            { id:'art16', emoji:'🔓', name:'โล่ประกาศเลิกทาส ร.5',         era:'ratana', eraName:'รัตนโกสินทร์', year:'พ.ศ. 2448',
+              desc:'อนุสรณ์แห่งการประกาศเลิกทาสอย่างสมบูรณ์โดยรัชกาลที่ 5 ปลดแอกชาวสยามหลายแสนคน',
+              price:200, rarity:'uncommon' },
+        ];
+
+        function getNearestEvents(yearBE, eraId) {
+            const evs = historicalEvents.filter(e => e.era === eraId);
+            const past = evs.filter(e => e.year_be <= yearBE).sort((a,b) => b.year_be - a.year_be)[0] || null;
+            const next = evs.filter(e => e.year_be > yearBE).sort((a,b) => a.year_be - b.year_be)[0] || null;
+            return { past, next };
+        }
+
+        function getNearestWorldEvents(yearBE) {
+            const past = worldEvents.filter(e => e.year_be <= yearBE).sort((a,b) => b.year_be - a.year_be).slice(0,2);
+            return past;
+        }
+
+        // ========== ARTIFACTS & CULTURE ==========
+        function renderEraInfo(eraId, yearBE) {
+            const info = eraInfo[eraId];
+            if (!info) return;
+            const king = yearBE ? getCurrentKing(yearBE) : null;
+            const kingBadge = king
+                ? `<div class="era-info-badge" title="${king.notable}"><span class="label">กษัตริย์&nbsp;</span><span class="value">${king.name_th}</span></div>
+                   <div class="era-info-badge"><span class="label">ราชวงศ์&nbsp;</span><span class="value">${king.dynasty}</span></div>`
+                : '';
+            document.getElementById('era-quick-info').innerHTML = `
+                <div class="era-info-badge"><span class="label">ช่วงเวลา&nbsp;</span><span class="value">${info.period}</span></div>
+                <div class="era-info-badge"><span class="label">ราชธานี&nbsp;</span><span class="value">${info.capital}</span></div>
+                ${kingBadge}
+                ${info.highlights.slice(0,1).map(h => `<div class="era-highlight-item">${h}</div>`).join('')}
+            `;
+
+            // ── Update floating era info box ──
+            const color = eraPillColors[eraId] || '#8B1A1A';
+            const eraName = eraMapData[eraId] ? eraMapData[eraId].name : (database[eraId] ? database[eraId].name : '');
+
+            // Header
+            document.getElementById('efb-dot').style.background = color;
+            document.getElementById('efb-era-badge').style.background = color;
+            document.getElementById('efb-era-name').textContent = eraName;
+            document.getElementById('efb-era-name').style.color = color;
+            document.getElementById('era-float-box').style.borderColor = `rgba(${hexToRgb(color)}, 0.4)`;
+
+            // Section 1 — era overview
+            document.getElementById('efb-period').textContent = info.period;
+            document.getElementById('efb-capital').textContent = info.capital;
+            document.getElementById('efb-duration').textContent = info.duration;
+            document.getElementById('efb-era-highlight').innerHTML =
+                info.highlights.slice(0, 1).map(h => `<div class="efb-highlight-row">${h}</div>`).join('');
+
+            // Section 2 — year specific
+            document.getElementById('efb-year-tag').textContent = `พ.ศ. ${yearBE}`;
+
+            // King (reuse king from above)
+            document.getElementById('efb-king-area').innerHTML = king ? `
+                <div class="efb-king-card">
+                    <div class="efb-king-name">${king.name_th}</div>
+                    <div class="efb-king-meta">${king.dynasty} · ค.ศ. ${king.reign_start}–${king.reign_end}</div>
+                    <div class="efb-king-notable">${king.notable}</div>
+                </div>` : `<div class="efb-empty">ไม่พบข้อมูลพระมหากษัตริย์</div>`;
+
+            // Events
+            const { past, next } = getNearestEvents(yearBE, eraId);
+            let evHtml = '';
+            if (past) evHtml += `
+                <div class="efb-event-card">
+                    <div class="efb-event-year">${past.emoji} พ.ศ. ${past.year_be}${past.year_be === yearBE ? ' · ปีนี้' : ' · เกิดขึ้นแล้ว'}</div>
+                    <div class="efb-event-title">${past.title}</div>
+                    <div class="efb-event-desc">${past.desc}</div>
+                </div>`;
+            if (next) evHtml += `
+                <div class="efb-event-card efb-event-upcoming">
+                    <div class="efb-event-year">⏳ พ.ศ. ${next.year_be} · อีก ${next.year_be - yearBE} ปี</div>
+                    <div class="efb-event-title">${next.title}</div>
+                    <div class="efb-event-desc">${next.desc}</div>
+                </div>`;
+            if (!past && !next) evHtml = `<div class="efb-empty">ไม่มีเหตุการณ์บันทึก</div>`;
+            document.getElementById('efb-events-area').innerHTML = evHtml;
+
+            // Section 3 — world comparison
+            const worldEvs = getNearestWorldEvents(yearBE);
+            document.getElementById('efb-world-area').innerHTML = worldEvs.length
+                ? worldEvs.map(e => `
+                    <div class="efb-world-card">
+                        <div class="efb-world-country">${e.country} · พ.ศ. ${e.year_be}</div>
+                        <div class="efb-world-title">${e.title}</div>
+                        <div class="efb-world-desc">${e.desc}</div>
+                    </div>`).join('')
+                : `<div class="efb-empty">ไม่มีข้อมูลเหตุการณ์โลก</div>`;
+
+        }
+
+        function hexToRgb(hex) {
+            const r = parseInt(hex.slice(1,3),16);
+            const g = parseInt(hex.slice(3,5),16);
+            const b = parseInt(hex.slice(5,7),16);
+            return `${r},${g},${b}`;
+        }
+
+        // ── ERA BOX TOGGLE ──
+        let eraBoxOpen = true;
+        function toggleEraBox() {
+            eraBoxOpen = !eraBoxOpen;
+            const box = document.getElementById('era-float-box');
+            const btn = document.getElementById('efb-toggle-btn');
+            if (eraBoxOpen) {
+                box.classList.remove('collapsed');
+                btn.style.display = 'none';
+            } else {
+                box.classList.add('collapsed');
+                btn.style.display = 'flex';
+            }
+        }
+
+        // ── SIDEBAR RESIZE ──
+        (function() {
+            const handle = document.getElementById('sidebar-resize-handle');
+            const sidebar = document.querySelector('.right-sidebar');
+            const timelineBar = document.querySelector('.timeline-bar');
+            const MIN_W = 260, MAX_W = 560;
+            let dragging = false, startX = 0, startW = 0;
+
+            function positionHandle() {
+                const w = sidebar.offsetWidth;
+                handle.style.right = w + 'px';
+            }
+
+            function setWidth(w) {
+                w = Math.max(MIN_W, Math.min(MAX_W, w));
+                sidebar.style.width = w + 'px';
+                document.documentElement.style.setProperty('--sidebar-w', w + 'px');
+                timelineBar.style.right = w + 'px';
+                positionHandle();
+            }
+
+            handle.addEventListener('mousedown', e => {
+                dragging = true;
+                startX = e.clientX;
+                startW = sidebar.offsetWidth;
+                handle.classList.add('dragging');
+                document.body.style.userSelect = 'none';
+                document.body.style.cursor = 'ew-resize';
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', e => {
+                if (!dragging) return;
+                const delta = startX - e.clientX;
+                setWidth(startW + delta);
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (!dragging) return;
+                dragging = false;
+                handle.classList.remove('dragging');
+                document.body.style.userSelect = '';
+                document.body.style.cursor = '';
+            });
+
+            window.addEventListener('resize', positionHandle);
+            positionHandle();
+        })();
+
+        // ========== KINGS DATA ==========
+        const kingsData = [
+          { id:1,  era:"สุโขทัย",     name_th:"พ่อขุนศรีอินทราทิตย์",                      name_en:"Pho Khun Si Inthrathit",              dynasty:"ราชวงศ์พระร่วง",         reign_start:1238, reign_end:1257,  notable:"ผู้ก่อตั้งอาณาจักรสุโขทัย ปลดแอกจากขอม" },
+          { id:2,  era:"สุโขทัย",     name_th:"พ่อขุนบานเมือง",                             name_en:"Pho Khun Ban Mueang",                 dynasty:"ราชวงศ์พระร่วง",         reign_start:1257, reign_end:1279,  notable:"พระราชโอรสของพ่อขุนศรีอินทราทิตย์" },
+          { id:3,  era:"สุโขทัย",     name_th:"พ่อขุนรามคำแหงมหาราช",                      name_en:"Pho Khun Ramkhamhaeng the Great",     dynasty:"ราชวงศ์พระร่วง",         reign_start:1279, reign_end:1298,  notable:"ประดิษฐ์อักษรไทย ขยายอาณาจักรกว้างใหญ่" },
+          { id:4,  era:"สุโขทัย",     name_th:"พระยาเลอไท",                                name_en:"Phrya Loethai",                       dynasty:"ราชวงศ์พระร่วง",         reign_start:1298, reign_end:1323,  notable:"ทรงทำนุบำรุงพระพุทธศาสนา" },
+          { id:5,  era:"สุโขทัย",     name_th:"พระยางั่วนำถม",                              name_en:"Phrya Ngua Nam Thom",                 dynasty:"ราชวงศ์พระร่วง",         reign_start:1323, reign_end:1347,  notable:"ช่วงอาณาจักรเริ่มอ่อนแอลง" },
+          { id:6,  era:"สุโขทัย",     name_th:"พระมหาธรรมราชาที่ 1 (ลิไท)",               name_en:"Phra Mahathammaracha I (Lithai)",     dynasty:"ราชวงศ์พระร่วง",         reign_start:1347, reign_end:1368,  notable:"ทรงพระราชนิพนธ์ไตรภูมิกถา" },
+          { id:7,  era:"สุโขทัย",     name_th:"พระมหาธรรมราชาที่ 2",                       name_en:"Phra Mahathammaracha II",             dynasty:"ราชวงศ์พระร่วง",         reign_start:1368, reign_end:1398,  notable:"เป็นเมืองขึ้นของอยุธยาบางส่วน" },
+          { id:8,  era:"สุโขทัย",     name_th:"พระมหาธรรมราชาที่ 3 (ไสยลือไท)",           name_en:"Phra Mahathammaracha III",            dynasty:"ราชวงศ์พระร่วง",         reign_start:1398, reign_end:1419,  notable:"ต่อสู้อำนาจอยุธยา" },
+          { id:9,  era:"สุโขทัย",     name_th:"พระมหาธรรมราชาที่ 4 (บรมปาล)",             name_en:"Phra Mahathammaracha IV",             dynasty:"ราชวงศ์พระร่วง",         reign_start:1419, reign_end:1438,  notable:"กษัตริย์องค์สุดท้ายของสุโขทัย" },
+          { id:10, era:"อยุธยา",      name_th:"สมเด็จพระรามาธิบดีที่ 1 (อู่ทอง)",         name_en:"Ramathibodi I (U Thong)",             dynasty:"ราชวงศ์อู่ทอง",           reign_start:1351, reign_end:1369,  notable:"ผู้ก่อตั้งกรุงศรีอยุธยา พ.ศ.1893" },
+          { id:11, era:"อยุธยา",      name_th:"สมเด็จพระราเมศวร (ครั้งที่ 1)",             name_en:"Ramesuan (1st reign)",                dynasty:"ราชวงศ์อู่ทอง",           reign_start:1369, reign_end:1370,  notable:"ครองราชย์ครั้งแรกช่วงสั้น" },
+          { id:12, era:"อยุธยา",      name_th:"สมเด็จพระบรมราชาธิราชที่ 1 (ขุนหลวงพะงั่ว)",name_en:"Borommaracha I",                    dynasty:"ราชวงศ์สุพรรณภูมิ",      reign_start:1370, reign_end:1388,  notable:"ขยายอำนาจสู่สุโขทัยและเหนือ" },
+          { id:13, era:"อยุธยา",      name_th:"สมเด็จพระเจ้าทองลัน",                       name_en:"Thong Lan",                           dynasty:"ราชวงศ์สุพรรณภูมิ",      reign_start:1388, reign_end:1388,  notable:"ครองราชย์เพียง 7 วัน" },
+          { id:14, era:"อยุธยา",      name_th:"สมเด็จพระราเมศวร (ครั้งที่ 2)",             name_en:"Ramesuan (2nd reign)",                dynasty:"ราชวงศ์อู่ทอง",           reign_start:1388, reign_end:1395,  notable:"ตีได้เชียงใหม่" },
+          { id:15, era:"อยุธยา",      name_th:"สมเด็จพระรามราชาธิราช",                     name_en:"Ram Racha",                           dynasty:"ราชวงศ์อู่ทอง",           reign_start:1395, reign_end:1409,  notable:"ถูกชิงอำนาจโดยราชวงศ์สุพรรณภูมิ" },
+          { id:16, era:"อยุธยา",      name_th:"สมเด็จพระอินทราชา (นครอินทร์)",             name_en:"Intharacha",                          dynasty:"ราชวงศ์สุพรรณภูมิ",      reign_start:1409, reign_end:1424,  notable:"ราชวงศ์สุพรรณภูมิกลับมาครองอำนาจ" },
+          { id:17, era:"อยุธยา",      name_th:"สมเด็จพระบรมราชาธิราชที่ 2 (เจ้าสามพระยา)",name_en:"Borommaracha II",                    dynasty:"ราชวงศ์สุพรรณภูมิ",      reign_start:1424, reign_end:1448,  notable:"ตีได้นครธม เขมร" },
+          { id:18, era:"อยุธยา",      name_th:"สมเด็จพระบรมไตรโลกนาถ",                    name_en:"Borommatrailokanat",                  dynasty:"ราชวงศ์สุพรรณภูมิ",      reign_start:1448, reign_end:1488,  notable:"ปฏิรูปการปกครองครั้งใหญ่ กฎมณเฑียรบาล" },
+          { id:19, era:"อยุธยา",      name_th:"สมเด็จพระบรมราชาธิราชที่ 3",               name_en:"Borommaracha III",                    dynasty:"ราชวงศ์สุพรรณภูมิ",      reign_start:1488, reign_end:1491,  notable:"ครองราชย์สั้น" },
+          { id:20, era:"อยุธยา",      name_th:"สมเด็จพระรามาธิบดีที่ 2",                  name_en:"Ramathibodi II",                      dynasty:"ราชวงศ์สุพรรณภูมิ",      reign_start:1491, reign_end:1529,  notable:"โปรตุเกสเข้ามาค้าขายครั้งแรก" },
+          { id:21, era:"อยุธยา",      name_th:"สมเด็จพระบรมราชาธิราชที่ 4 (หน่อพุทธางกูร)",name_en:"Borommaracha IV",                   dynasty:"ราชวงศ์สุพรรณภูมิ",      reign_start:1529, reign_end:1533,  notable:"ทำนุบำรุงพระพุทธศาสนา" },
+          { id:22, era:"อยุธยา",      name_th:"สมเด็จพระรัษฎาธิราช",                       name_en:"Ratsadathirat",                       dynasty:"ราชวงศ์สุพรรณภูมิ",      reign_start:1533, reign_end:1534,  notable:"ครองราชย์เพียง 5 เดือน" },
+          { id:23, era:"อยุธยา",      name_th:"สมเด็จพระไชยราชาธิราช",                     name_en:"Chairacha",                           dynasty:"ราชวงศ์สุพรรณภูมิ",      reign_start:1534, reign_end:1547,  notable:"ทำสงครามพม่า นำปืนใหญ่มาใช้" },
+          { id:24, era:"อยุธยา",      name_th:"สมเด็จพระยอดฟ้า (แก้วฟ้า)",                name_en:"Yot Fa",                              dynasty:"ราชวงศ์สุพรรณภูมิ",      reign_start:1547, reign_end:1548,  notable:"กษัตริย์เด็ก พระชันษา 11 ปี" },
+          { id:25, era:"อยุธยา",      name_th:"สมเด็จพระมหาจักรพรรดิ",                    name_en:"Maha Chakkraphat",                    dynasty:"ราชวงศ์สุพรรณภูมิ",      reign_start:1548, reign_end:1568,  notable:"ศึกช้างเผือก ศึกพระเจ้าบุเรงนอง" },
+          { id:26, era:"อยุธยา",      name_th:"สมเด็จพระมหินทราธิราช",                     name_en:"Mahin",                               dynasty:"ราชวงศ์สุพรรณภูมิ",      reign_start:1568, reign_end:1569,  notable:"อยุธยาแพ้พม่าครั้งที่ 1 พ.ศ.2112" },
+          { id:27, era:"อยุธยา",      name_th:"สมเด็จพระมหาธรรมราชาธิราช",                name_en:"Mahathammaracha",                     dynasty:"ราชวงศ์สุโขทัย",         reign_start:1569, reign_end:1590,  notable:"ครองราชย์ภายใต้พม่า พ่อของนเรศวร" },
+          { id:28, era:"อยุธยา",      name_th:"สมเด็จพระนเรศวรมหาราช",                    name_en:"Naresuan the Great",                  dynasty:"ราชวงศ์สุโขทัย",         reign_start:1590, reign_end:1605,  notable:"ประกาศอิสรภาพจากพม่า ยุทธหัตถีกับมังกะยอชวา" },
+          { id:29, era:"อยุธยา",      name_th:"สมเด็จพระเอกาทศรถ",                         name_en:"Ekathotsarot",                        dynasty:"ราชวงศ์สุโขทัย",         reign_start:1605, reign_end:1610,  notable:"พระอนุชานเรศวร ทำสนธิสัญญากับฮอลันดา" },
+          { id:30, era:"อยุธยา",      name_th:"สมเด็จพระศรีเสาวภาคย์",                     name_en:"Si Saowaphak",                        dynasty:"ราชวงศ์สุโขทัย",         reign_start:1610, reign_end:1611,  notable:"ถูกสำเร็จโทษ ครองราชย์สั้น" },
+          { id:31, era:"อยุธยา",      name_th:"สมเด็จพระเจ้าทรงธรรม",                      name_en:"Songtham",                            dynasty:"ราชวงศ์สุโขทัย",         reign_start:1611, reign_end:1628,  notable:"อังกฤษเข้ามาค้าขาย" },
+          { id:32, era:"อยุธยา",      name_th:"สมเด็จพระเชษฐาธิราช",                       name_en:"Chetthathirat",                       dynasty:"ราชวงศ์สุโขทัย",         reign_start:1628, reign_end:1629,  notable:"ถูกสำเร็จโทษ" },
+          { id:33, era:"อยุธยา",      name_th:"สมเด็จพระอาทิตยวงศ์",                       name_en:"Athitayawong",                        dynasty:"ราชวงศ์สุโขทัย",         reign_start:1629, reign_end:1629,  notable:"กษัตริย์เด็ก ครองราชย์เพียง 36 วัน" },
+          { id:34, era:"อยุธยา",      name_th:"สมเด็จพระเจ้าปราสาททอง",                   name_en:"Prasat Thong",                        dynasty:"ราชวงศ์ปราสาททอง",       reign_start:1629, reign_end:1656,  notable:"แย่งชิงอำนาจ ก่อตั้งราชวงศ์ใหม่" },
+          { id:35, era:"อยุธยา",      name_th:"สมเด็จเจ้าฟ้าไชย",                          name_en:"Chai",                                dynasty:"ราชวงศ์ปราสาททอง",       reign_start:1656, reign_end:1656,  notable:"ครองราชย์เพียง 9 วัน" },
+          { id:36, era:"อยุธยา",      name_th:"สมเด็จพระศรีสุธรรมราชา",                   name_en:"Si Suthammaracha",                    dynasty:"ราชวงศ์ปราสาททอง",       reign_start:1656, reign_end:1656,  notable:"ครองราชย์เพียง 2 เดือนเศษ" },
+          { id:37, era:"อยุธยา",      name_th:"สมเด็จพระนารายณ์มหาราช",                   name_en:"Narai the Great",                     dynasty:"ราชวงศ์ปราสาททอง",       reign_start:1656, reign_end:1688,  notable:"ยุคทองการค้า ฝรั่งเศส คอนสแตนติน ฟอลคอน" },
+          { id:38, era:"อยุธยา",      name_th:"สมเด็จพระเพทราชา",                          name_en:"Phetracha",                           dynasty:"ราชวงศ์บ้านพลูหลวง",     reign_start:1688, reign_end:1703,  notable:"ขับไล่ฝรั่งเศส ก่อตั้งราชวงศ์บ้านพลูหลวง" },
+          { id:39, era:"อยุธยา",      name_th:"สมเด็จพระสรรเพชญ์ที่ 8 (เจ้าเสือ)",        name_en:"Sanphet VIII (Tiger King)",           dynasty:"ราชวงศ์บ้านพลูหลวง",     reign_start:1703, reign_end:1709,  notable:"'พระเจ้าเสือ' กษัตริย์นักมวย" },
+          { id:40, era:"อยุธยา",      name_th:"สมเด็จพระสรรเพชญ์ที่ 9 (ท้ายสระ)",         name_en:"Sanphet IX (Thaisa)",                 dynasty:"ราชวงศ์บ้านพลูหลวง",     reign_start:1709, reign_end:1733,  notable:"ทรงรักสงบ บ้านเมืองสงบสุข" },
+          { id:41, era:"อยุธยา",      name_th:"สมเด็จพระเจ้าอยู่หัวบรมโกศ",               name_en:"Boromakot",                           dynasty:"ราชวงศ์บ้านพลูหลวง",     reign_start:1733, reign_end:1758,  notable:"ยุคทองพุทธศาสนา ส่งพระไปลังกา" },
+          { id:42, era:"อยุธยา",      name_th:"สมเด็จพระเจ้าอยู่หัวอุทุมพร",              name_en:"Uthumphon",                           dynasty:"ราชวงศ์บ้านพลูหลวง",     reign_start:1758, reign_end:1758,  notable:"สละราชสมบัติ ออกผนวช" },
+          { id:43, era:"อยุธยา",      name_th:"สมเด็จพระเจ้าเอกทัศ (สุริยามรินทร์)",      name_en:"Ekkathat",                            dynasty:"ราชวงศ์บ้านพลูหลวง",     reign_start:1758, reign_end:1767,  notable:"กษัตริย์องค์สุดท้ายของอยุธยา เสียกรุง พ.ศ.2310" },
+          { id:44, era:"ธนบุรี",      name_th:"สมเด็จพระเจ้ากรุงธนบุรี (พระเจ้าตากสินมหาราช)", name_en:"Taksin the Great",             dynasty:"ราชวงศ์ธนบุรี",           reign_start:1767, reign_end:1782,  notable:"กู้ชาติจากพม่า รวบรวมแผ่นดิน ตั้งกรุงธนบุรี" },
+          { id:45, era:"รัตนโกสินทร์", name_th:"พระบาทสมเด็จพระพุทธยอดฟ้าจุฬาโลก (รัชกาลที่ 1)", name_en:"Rama I",                   dynasty:"ราชวงศ์จักรี",            reign_start:1782, reign_end:1809,  notable:"สถาปนากรุงรัตนโกสินทร์ สร้างวัดพระแก้ว" },
+          { id:46, era:"รัตนโกสินทร์", name_th:"พระบาทสมเด็จพระพุทธเลิศหล้านภาลัย (รัชกาลที่ 2)", name_en:"Rama II",                 dynasty:"ราชวงศ์จักรี",            reign_start:1809, reign_end:1824,  notable:"ยุคทองวรรณคดี บทละคร รามเกียรติ์" },
+          { id:47, era:"รัตนโกสินทร์", name_th:"พระบาทสมเด็จพระนั่งเกล้าเจ้าอยู่หัว (รัชกาลที่ 3)", name_en:"Rama III",               dynasty:"ราชวงศ์จักรี",            reign_start:1824, reign_end:1851,  notable:"บูรณะวัดโพธิ์ ค้าขายกับต่างประเทศรุ่งเรือง" },
+          { id:48, era:"รัตนโกสินทร์", name_th:"พระบาทสมเด็จพระจอมเกล้าเจ้าอยู่หัว (รัชกาลที่ 4)", name_en:"Rama IV",                dynasty:"ราชวงศ์จักรี",            reign_start:1851, reign_end:1868,  notable:"ปรับตัวสู่ตะวันตก สนธิสัญญาเบาริง" },
+          { id:49, era:"รัตนโกสินทร์", name_th:"พระบาทสมเด็จพระจุลจอมเกล้าเจ้าอยู่หัว (รัชกาลที่ 5)", name_en:"Rama V",              dynasty:"ราชวงศ์จักรี",            reign_start:1868, reign_end:1910,  notable:"เลิกทาส ปฏิรูปการปกครอง รักษาเอกราช" },
+          { id:50, era:"รัตนโกสินทร์", name_th:"พระบาทสมเด็จพระมงกุฎเกล้าเจ้าอยู่หัว (รัชกาลที่ 6)", name_en:"Rama VI",              dynasty:"ราชวงศ์จักรี",            reign_start:1910, reign_end:1925,  notable:"สถาปนาจุฬาลงกรณ์มหาวิทยาลัย เข้าสงครามโลกครั้งที่ 1" },
+          { id:51, era:"รัตนโกสินทร์", name_th:"พระบาทสมเด็จพระปกเกล้าเจ้าอยู่หัว (รัชกาลที่ 7)", name_en:"Rama VII",               dynasty:"ราชวงศ์จักรี",            reign_start:1925, reign_end:1935,  notable:"เปลี่ยนแปลงการปกครอง 2475 สละราชสมบัติ" }
+        ];
+
+        function getCurrentKing(yearBE) {
+            const yearCE = yearBE - 543;
+            return kingsData.find(k => yearCE >= k.reign_start && yearCE <= k.reign_end) || null;
+        }
+
+        function kingToCharacter(king) {
+            const eraAvatars = { 'สุโขทัย': '👑', 'อยุธยา': '⚔️', 'ธนบุรี': '🏹', 'รัตนโกสินทร์': '📜' };
+            const eraKeys = { 'สุโขทัย': 'sukho', 'อยุธยา': 'ayu', 'ธนบุรี': 'thon', 'รัตนโกสินทร์': 'ratana' };
+            const greetingByEra = {
+                'สุโขทัย':      `เจริญพร ข้าคือ${king.name_th} ${king.notable} มีเรื่องใดอยากรู้เกี่ยวกับรัชสมัยของข้า?`,
+                'อยุธยา':       `ข้าคือ${king.name_th} แห่ง${king.dynasty} — ${king.notable} จะถามเรื่องใด?`,
+                'ธนบุรี':       `ข้าตากสินมหาราช ${king.notable} เจ้ามาหาข้าด้วยเรื่องอันใด?`,
+                'รัตนโกสินทร์': `ข้าคือ${king.name_th} ${king.notable} ยินดีตอบทุกคำถามเกี่ยวกับรัชกาลของข้า`
+            };
+            return {
+                id: `king_${king.id}`,
+                name: king.name_th,
+                role: `${king.dynasty} · ค.ศ. ${king.reign_start}–${king.reign_end}`,
+                avatar: eraAvatars[king.era] || '👑',
+                era: eraKeys[king.era] || 'sukho',
+                greeting: greetingByEra[king.era] || `ข้าคือ${king.name_th} มีเรื่องใดจะถาม?`,
+                keywords: [
+                    `${king.name_th}ทรงทำอะไรที่สำคัญที่สุด?`,
+                    `เหตุการณ์ใดเกิดขึ้นในรัชกาลนี้?`,
+                    `ราชวงศ์${king.dynasty}มีความสำคัญอย่างไร?`,
+                    `บ้านเมืองในยุค ค.ศ. ${king.reign_start} เป็นอย่างไร?`
+                ]
+            };
+        }
+
+        // ========== PREMIUM ILLUSTRATED AVATARS (SVG) ==========
+        const AVATAR_SVGS = {
+            // User / Explorer Avatar
+            user: `<svg viewBox="0 0 100 100" class="svg-avatar">
+                <defs>
+                  <linearGradient id="bgUser" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#1A252C"/>
+                    <stop offset="100%" stop-color="#0A1015"/>
+                  </linearGradient>
+                  <linearGradient id="compassGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#00D2FF"/>
+                    <stop offset="100%" stop-color="#0066FF"/>
+                  </linearGradient>
+                </defs>
+                <circle cx="50" cy="50" r="48" fill="url(#bgUser)" stroke="#00D2FF" stroke-width="2" filter="drop-shadow(0 0 4px rgba(0,210,255,0.4))"/>
+                <circle cx="50" cy="50" r="30" stroke="rgba(0,210,255,0.15)" stroke-width="1" fill="none"/>
+                <line x1="50" y1="15" x2="50" y2="85" stroke="rgba(0,210,255,0.15)" stroke-width="1"/>
+                <line x1="15" y1="50" x2="85" y2="50" stroke="rgba(0,210,255,0.15)" stroke-width="1"/>
+                <path d="M30 80 C30 68, 38 63, 50 63 C62 63, 70 68, 70 80 Z" fill="#EAECEE"/>
+                <path d="M43 63 L50 71 L57 63 Z" fill="#FFD54F"/>
+                <circle cx="50" cy="48" r="15" fill="#EAECEE"/>
+                <path d="M26 38 L50 28 L74 38 L50 48 Z" fill="#34495E"/>
+                <rect x="42" y="43" width="16" height="6" fill="#2C3E50"/>
+                <path d="M70 38 L70 54 L68 54 L68 38" fill="#FFD54F"/>
+                <path d="M78 22 L80 14 L82 22 L90 24 L82 26 L80 34 L78 26 L70 24 Z" fill="url(#compassGrad)"/>
+            </svg>`,
+            
+            // Father Ramkhamhaeng (s1)
+            s1: `<svg viewBox="0 0 100 100" class="svg-avatar">
+                <defs>
+                  <linearGradient id="bgS1" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#B8860B"/>
+                    <stop offset="100%" stop-color="#556B2F"/>
+                  </linearGradient>
+                  <linearGradient id="goldS1" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#FFE79A"/>
+                    <stop offset="100%" stop-color="#D4AF37"/>
+                  </linearGradient>
+                  <linearGradient id="stoneS1" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#E0E0E0"/>
+                    <stop offset="100%" stop-color="#757575"/>
+                  </linearGradient>
+                </defs>
+                <circle cx="50" cy="50" r="48" fill="url(#bgS1)" stroke="#FFE79A" stroke-width="2"/>
+                <path d="M35 80 L35 45 Q35 35 50 35 Q65 35 65 45 L65 80 Z" fill="url(#stoneS1)" opacity="0.6"/>
+                <line x1="42" y1="48" x2="58" y2="48" stroke="#333333" stroke-width="1.5" stroke-linecap="round"/>
+                <line x1="40" y1="56" x2="60" y2="56" stroke="#333333" stroke-width="1.5" stroke-linecap="round"/>
+                <line x1="42" y1="64" x2="58" y2="64" stroke="#333333" stroke-width="1.5" stroke-linecap="round"/>
+                <path d="M25 72 L32 40 L45 52 L50 25 L55 52 L68 40 L75 72 Z" fill="url(#goldS1)" filter="drop-shadow(0px 3px 4px rgba(0,0,0,0.5))"/>
+                <rect x="28" y="67" width="44" height="6" rx="3" fill="#D4AF37" stroke="#8B6508" stroke-width="1"/>
+            </svg>`,
+            
+            // Yai Sa (s2)
+            s2: `<svg viewBox="0 0 100 100" class="svg-avatar">
+                <defs>
+                  <linearGradient id="bgS2" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#E28743"/>
+                    <stop offset="100%" stop-color="#76300D"/>
+                  </linearGradient>
+                  <linearGradient id="skinS2" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#FCD5A3"/>
+                    <stop offset="100%" stop-color="#E0AC69"/>
+                  </linearGradient>
+                </defs>
+                <circle cx="50" cy="50" r="48" fill="url(#bgS2)" stroke="#FCD5A3" stroke-width="2"/>
+                <circle cx="50" cy="30" r="14" fill="#5A5A5A"/>
+                <circle cx="50" cy="18" r="8" fill="#5A5A5A"/>
+                <line x1="58" y1="12" x2="42" y2="24" stroke="#D4AF37" stroke-width="3" stroke-linecap="round"/>
+                <path d="M42 75 L42 60 L58 60 L58 75 Z" fill="url(#skinS2)"/>
+                <circle cx="50" cy="45" r="17" fill="url(#skinS2)"/>
+                <path d="M40 45 Q44 49 48 45" stroke="#4A3B32" stroke-width="2" fill="none" stroke-linecap="round"/>
+                <path d="M52 45 Q56 49 60 45" stroke="#4A3B32" stroke-width="2" fill="none" stroke-linecap="round"/>
+                <path d="M44 53 Q50 59 56 53" stroke="#B22222" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+                <path d="M30 80 C30 70, 38 65, 50 65 C62 65, 70 70, 70 80 Z" fill="#D2B48C"/>
+                <path d="M40 65 L50 78 L60 65 Z" fill="url(#skinS2)"/>
+            </svg>`,
+            
+            // King Naresuan (a1)
+            a1: `<svg viewBox="0 0 100 100" class="svg-avatar">
+                <defs>
+                  <linearGradient id="bgA1" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#800000"/>
+                    <stop offset="100%" stop-color="#3A0000"/>
+                  </linearGradient>
+                  <linearGradient id="helmetGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#D4AF37"/>
+                    <stop offset="50%" stop-color="#A67C1E"/>
+                    <stop offset="100%" stop-color="#5B4010"/>
+                  </linearGradient>
+                </defs>
+                <circle cx="50" cy="50" r="48" fill="url(#bgA1)" stroke="#D4AF37" stroke-width="2"/>
+                <path d="M25 80 C25 65, 35 60, 50 60 C65 60, 75 65, 75 80 Z" fill="#424242" stroke="#D4AF37" stroke-width="1.5"/>
+                <path d="M40 60 L50 70 L60 60 Z" fill="#FFE0B2"/>
+                <circle cx="50" cy="48" r="15" fill="#FFE0B2"/>
+                <path d="M33 42 C33 22, 67 22, 67 42 Z" fill="url(#helmetGrad)"/>
+                <path d="M48 24 L52 24 L50 8 Z" fill="url(#helmetGrad)"/>
+                <path d="M33 42 L67 42 L50 48 Z" fill="url(#helmetGrad)"/>
+                <path d="M12 25 L88 77" stroke="#E0E0E0" stroke-width="4" stroke-linecap="round"/>
+                <path d="M8 22 L15 28" stroke="#D4AF37" stroke-width="6" stroke-linecap="round"/>
+                <line x1="42" y1="47" x2="47" y2="46" stroke="#212121" stroke-width="2"/>
+                <line x1="53" y1="46" x2="58" y2="47" stroke="#212121" stroke-width="2"/>
+                <path d="M45 54 Q50 56 55 54" stroke="#212121" stroke-width="2" fill="none"/>
+            </svg>`,
+            
+            // Constantine Phaulkon (a2)
+            a2: `<svg viewBox="0 0 100 100" class="svg-avatar">
+                <defs>
+                  <linearGradient id="bgA2" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#0E6251"/>
+                    <stop offset="100%" stop-color="#0B3C33"/>
+                  </linearGradient>
+                  <linearGradient id="hairA2" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#F5B041"/>
+                    <stop offset="100%" stop-color="#D35400"/>
+                  </linearGradient>
+                </defs>
+                <circle cx="50" cy="50" r="48" fill="url(#bgA2)" stroke="#76D7C4" stroke-width="2"/>
+                <circle cx="34" cy="44" r="10" fill="url(#hairA2)"/>
+                <circle cx="66" cy="44" r="10" fill="url(#hairA2)"/>
+                <circle cx="32" cy="54" r="11" fill="url(#hairA2)"/>
+                <circle cx="68" cy="54" r="11" fill="url(#hairA2)"/>
+                <path d="M44 70 L44 58 L56 58 L56 70 Z" fill="#FDF2E9"/>
+                <circle cx="50" cy="44" r="16" fill="#FDF2E9"/>
+                <circle cx="50" cy="30" r="12" fill="url(#hairA2)"/>
+                <circle cx="40" cy="32" r="10" fill="url(#hairA2)"/>
+                <circle cx="60" cy="32" r="10" fill="url(#hairA2)"/>
+                <path d="M30 75 Q40 68 50 75 Q60 68 70 75 L70 82 L30 82 Z" fill="#FFFFFF"/>
+                <path d="M34 77 L50 82 L66 77" stroke="#E5E7E9" stroke-width="1.5" fill="none"/>
+                <path d="M28 80 C28 75, 32 78, 50 78 C68 78, 72 75, 72 80 Z" fill="#2471A3"/>
+                <circle cx="44" cy="44" r="1.5" fill="#2C3E50"/>
+                <circle cx="56" cy="44" r="1.5" fill="#2C3E50"/>
+                <path d="M43 49 C45 49 48 47 50 49 C52 47 55 49 57 49" stroke="#9A7D0A" stroke-width="2" fill="none" stroke-linecap="round"/>
+                <path d="M47 53 Q50 55 53 53" stroke="#2C3E50" stroke-width="1" fill="none"/>
+            </svg>`,
+            
+            // Soldier (t1)
+            t1: `<svg viewBox="0 0 100 100" class="svg-avatar">
+                <defs>
+                  <linearGradient id="bgT1" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#145A32"/>
+                    <stop offset="100%" stop-color="#0B301A"/>
+                  </linearGradient>
+                  <linearGradient id="skinT1" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#E2AF80"/>
+                    <stop offset="100%" stop-color="#C58B58"/>
+                  </linearGradient>
+                </defs>
+                <circle cx="50" cy="50" r="48" fill="url(#bgT1)" stroke="#52BE80" stroke-width="2"/>
+                <path d="M15 75 L85 25" stroke="#BDC3C7" stroke-width="3" stroke-linecap="round"/>
+                <path d="M85 75 L15 25" stroke="#BDC3C7" stroke-width="3" stroke-linecap="round"/>
+                <circle cx="15" cy="75" r="3" fill="#D4AF37"/>
+                <circle cx="85" cy="75" r="3" fill="#D4AF37"/>
+                <path d="M28 80 C28 68, 38 64, 50 64 C62 64, 72 68, 72 80 Z" fill="#873A5C" stroke="#D4AF37" stroke-width="1"/>
+                <path d="M42 64 L50 72 L58 64 Z" fill="url(#skinT1)"/>
+                <circle cx="50" cy="49" r="15" fill="url(#skinT1)"/>
+                <path d="M35 44 C35 30, 65 30, 65 44 Z" fill="#5D4037" stroke="#D4AF37" stroke-width="1"/>
+                <rect x="33" y="42" width="34" height="4" fill="#D4AF37"/>
+                <line x1="50" y1="30" x2="50" y2="24" stroke="#D4AF37" stroke-width="2"/>
+                <circle cx="50" cy="22" r="2" fill="#D4AF37"/>
+                <path d="M38 52 C38 60 62 60 62 52" stroke="#2D1A12" stroke-width="3" fill="none" stroke-linecap="round"/>
+                <circle cx="44" cy="46" r="1.5" fill="#2D1A12"/>
+                <circle cx="56" cy="46" r="1.5" fill="#2D1A12"/>
+            </svg>`,
+            
+            // Sunthorn Phu (r1)
+            r1: `<svg viewBox="0 0 100 100" class="svg-avatar">
+                <defs>
+                  <linearGradient id="bgR1" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#4A235A"/>
+                    <stop offset="100%" stop-color="#24142C"/>
+                  </linearGradient>
+                </defs>
+                <circle cx="50" cy="50" r="48" fill="url(#bgR1)" stroke="#C39BD3" stroke-width="2"/>
+                <path d="M68 62 L82 50 C85 47, 85 42, 82 39 L75 32" stroke="#F5F5DC" stroke-width="6" stroke-linecap="round" fill="none"/>
+                <path d="M26 80 C26 68, 36 63, 50 63 C64 63, 74 68, 74 80 Z" fill="#FFFFFF" stroke="#CCCCCC" stroke-width="1"/>
+                <path d="M42 63 L50 71 L58 63 Z" fill="#FFD54F"/>
+                <path d="M26 80 L50 63 L74 80 Z" fill="#FFFFFF" opacity="0.8"/>
+                <circle cx="50" cy="46" r="16" fill="#FFE082"/>
+                <path d="M34 40 C34 25, 66 25, 66 40 L62 38 C62 30, 38 30, 38 38 Z" fill="#1A1A1A"/>
+                <path d="M34 40 C34 32, 66 32, 66 40 Z" fill="#1A1A1A"/>
+                <path d="M41 45 Q44 43 47 45" stroke="#3E2723" stroke-width="2" fill="none"/>
+                <path d="M53 45 Q56 43 59 45" stroke="#3E2723" stroke-width="2" fill="none"/>
+                <path d="M45 50 Q50 49 55 50" stroke="#3E2723" stroke-width="1.5" fill="none"/>
+                <path d="M46 54 Q50 57 54 54" stroke="#D32F2F" stroke-width="2" fill="none"/>
+            </svg>`,
+            
+            // Canal Merchant (r2)
+            r2: `<svg viewBox="0 0 100 100" class="svg-avatar">
+                <defs>
+                  <linearGradient id="bgR2" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#78281F"/>
+                    <stop offset="100%" stop-color="#4A120E"/>
+                  </linearGradient>
+                  <linearGradient id="strawGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#E5C158"/>
+                    <stop offset="100%" stop-color="#A07810"/>
+                  </linearGradient>
+                </defs>
+                <circle cx="50" cy="50" r="48" fill="url(#bgR2)" stroke="#F1948A" stroke-width="2"/>
+                <path d="M15 72 L85 72 C75 80, 25 80, 15 72 Z" fill="#5D4037" stroke="#3E2723" stroke-width="1.5"/>
+                <line x1="72" y1="45" x2="88" y2="82" stroke="#8D6E63" stroke-width="3" stroke-linecap="round"/>
+                <path d="M30 72 C30 65, 38 60, 50 60 C62 60, 70 65, 70 72 Z" fill="#1C2833"/>
+                <path d="M42 60 L50 68 L58 60 Z" fill="#FADBD8"/>
+                <circle cx="50" cy="46" r="14" fill="#FADBD8"/>
+                <path d="M22 42 Q50 20 78 42 Z" fill="url(#strawGrad)" stroke="#7E5109" stroke-width="1"/>
+                <line x1="50" y1="20" x2="50" y2="42" stroke="#7E5109" stroke-width="1" opacity="0.3"/>
+                <line x1="36" y1="31" x2="64" y2="31" stroke="#7E5109" stroke-width="1" opacity="0.3"/>
+                <circle cx="44" cy="46" r="1.5" fill="#4A120E"/>
+                <circle cx="56" cy="46" r="1.5" fill="#4A120E"/>
+                <path d="M46 51 Q50 55 54 51" stroke="#E06666" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+            </svg>`
+        };
+
+        function getKingSVG(era) {
+            let stop1 = '#8B1A1A';
+            let stop2 = '#3D0B0B';
+            let stroke = '#D4AF37';
+            if (era === 'sukho') {
+                stop1 = '#8B6914';
+                stop2 = '#3D2F09';
+                stroke = '#FFE79A';
+            } else if (era === 'thon') {
+                stop1 = '#4A1A7A';
+                stop2 = '#1D0B3D';
+                stroke = '#E2B4FF';
+            } else if (era === 'ratana') {
+                stop1 = '#1A4A8A';
+                stop2 = '#0B1E3D';
+                stroke = '#B4D2FF';
+            }
+            return `
+            <svg viewBox="0 0 100 100" class="svg-avatar">
+              <defs>
+                <radialGradient id="kingGrad-${era || 'default'}" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="#FFF099"/>
+                  <stop offset="70%" stop-color="#D4AF37"/>
+                  <stop offset="100%" stop-color="#8B6914"/>
+                </radialGradient>
+                <linearGradient id="bgKing-${era || 'default'}" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="${stop1}"/>
+                  <stop offset="100%" stop-color="${stop2}"/>
+                </linearGradient>
+              </defs>
+              <circle cx="50" cy="50" r="48" fill="url(#bgKing-${era || 'default'})" stroke="${stroke}" stroke-width="2"/>
+              <path d="M20 70 L25 45 L40 55 L50 30 L60 55 L75 45 L80 70 Z" fill="url(#kingGrad-${era || 'default'})" filter="drop-shadow(0px 3px 3px rgba(0,0,0,0.4))"/>
+              <rect x="25" y="66" width="50" height="6" rx="3" fill="#B22222"/>
+              <circle cx="50" cy="30" r="4" fill="#FF4500"/>
+              <circle cx="25" cy="45" r="3" fill="#FF4500"/>
+              <circle cx="75" cy="45" r="3" fill="#FF4500"/>
+              <circle cx="40" cy="55" r="3" fill="#FF4500"/>
+              <circle cx="60" cy="55" r="3" fill="#FF4500"/>
+              <circle cx="35" cy="69" r="2" fill="#FFFFFF"/>
+              <circle cx="50" cy="69" r="2" fill="#FFFFFF"/>
+              <circle cx="65" cy="69" r="2" fill="#FFFFFF"/>
+            </svg>
+            `;
+        }
+
+        function getAvatarSVG(char) {
+            if (!char) return '';
+            const id = char.id || '';
+            const avatar = char.avatar || '';
+            const era = char.era || '';
+            
+            if (id === 's1') return AVATAR_SVGS.s1;
+            if (id === 's2') return AVATAR_SVGS.s2;
+            if (id === 'a1') return AVATAR_SVGS.a1;
+            if (id === 'a2') return AVATAR_SVGS.a2;
+            if (id === 't1') return AVATAR_SVGS.t1;
+            if (id === 'r1') return AVATAR_SVGS.r1;
+            if (id === 'r2') return AVATAR_SVGS.r2;
+            
+            if (id.toString().startsWith('king_') || avatar === '👑') {
+                return getKingSVG(era);
+            }
+            
+            if (avatar === '👵') return AVATAR_SVGS.s2;
+            if (avatar === '⚔️') return AVATAR_SVGS.a1;
+            if (avatar === '🧑‍✈️') return AVATAR_SVGS.a2;
+            if (avatar === '🏹') return AVATAR_SVGS.t1;
+            if (avatar === '📜') return AVATAR_SVGS.r1;
+            if (avatar === '🛶') return AVATAR_SVGS.r2;
+            if (avatar === '🎓') return AVATAR_SVGS.user;
+            
+            return `<div class="fallback-emoji-avatar">${avatar}</div>`;
+        }
+
+        function getUserAvatarSVG() {
+            return AVATAR_SVGS.user;
+        }
+
+        // ========== ERA DATA ==========
+
+        const database = {
+            sukho: { name: "สุโขทัย",
+                characters: [
+                    { id: "s1", name: "พ่อขุนรามคำแหง", role: "พระมหากษัตริย์", avatar: "👑",
+                      greeting: "เจริญพรหลานเจ้า มีเรื่องอันใดสงสัยในศิลาจารึกรึ?",
+                      keywords: ["อักษรไทยสร้างขึ้นได้อย่างไร?", "ศิลาจารึกหลักที่ 1 บันทึกอะไรบ้าง?", "การปกครองแบบพ่อปกครองลูกคืออะไร?", "สุโขทัยค้าขายกับใครบ้าง?", "พุทธศาสนามีบทบาทอย่างไรในยุคนี้?"] },
+                    { id: "s2", name: "ยายสา", role: "แม่ค้าตลาดปสาน", avatar: "👵",
+                      greeting: "มาซื้อผักซื้อปลารึพ่อหนุ่ม? วันนี้ตลาดปสานคนแน่นเชียว",
+                      keywords: ["ตลาดปสานขายอะไรบ้าง?", "ข้าวของราคาแพงไหมในยุคนี้?", "ชาวบ้านทั่วไปใช้ชีวิตอย่างไร?", "พ่อขุนฯ ดูแลราษฎรดีไหม?"] }
+                ]
+            },
+            ayu: { name: "อยุธยา",
+                characters: [
+                    { id: "a1", name: "สมเด็จพระนเรศวรมหาราช", role: "พระมหากษัตริย์ / แม่ทัพ", avatar: "⚔️",
+                      greeting: "ศึกเหนือเสือใต้ยังไม่สงบ เจ้ามีข่าวคราวอันใดมารายงานรึ?",
+                      keywords: ["ยุทธหัตถีเกิดขึ้นอย่างไร?", "ทำไมต้องประกาศอิสรภาพจากพม่า?", "กลยุทธ์การรบของพระองค์คืออะไร?", "อยุธยาเสียกรุงครั้งแรกเกิดจากอะไร?", "ชีวิตทหารในยุคอยุธยาเป็นอย่างไร?"] },
+                    { id: "a2", name: "คอนสแตนติน ฟอลคอน", role: "ขุนนางต่างชาติ", avatar: "🧑‍✈️",
+                      greeting: "Bonjour! มีเรื่องการค้าเรือสินค้าหรือการทูตที่อยากหารือไหม?",
+                      keywords: ["ชาวต่างชาติมาทำอะไรที่อยุธยา?", "การค้ากับยุโรปเป็นอย่างไร?", "ทำไมฝรั่งเศสสนใจอยุธยา?", "สินค้าอะไรที่ส่งออกมากที่สุด?", "ขุนนางต่างชาติมีอำนาจแค่ไหน?"] }
+                ]
+            },
+            thon: { name: "ธนบุรี",
+                characters: [
+                    { id: "t1", name: "ทหารกองเสบียงกรุงธนฯ", role: "ทหารผ่านศึก", avatar: "🏹",
+                      greeting: "เร่งมือช่วยกันขนข้าวสารเถิดออเจ้า กองทัพเพิ่งกลับมาจากศึก",
+                      keywords: ["กอบกู้เอกราชยากแค่ไหน?", "สมเด็จพระเจ้าตากสินเป็นอย่างไร?", "ทำไมย้ายเมืองหลวงมาธนบุรี?", "ชีวิตหลังเสียกรุงครั้งที่ 2 เป็นอย่างไร?", "ธนบุรีอยู่ได้แค่ 15 ปีเพราะอะไร?"] }
+                ]
+            },
+            ratana: { name: "รัตนโกสินทร์",
+                characters: [
+                    { id: "r1", name: "ท่านสุนทรภู่", role: "กวีเอกแห่งแผ่นดิน", avatar: "📜",
+                      greeting: "อันกลอนกลอนบทใดที่เจ้าชื่นชอบรึ? ข้ากำลังรังสรรค์นิราศเรื่องใหม่อยู่",
+                      keywords: ["นิราศภูเขาทองเขียนถึงอะไร?", "พระอภัยมณีมีเนื้อเรื่องอย่างไร?", "ท่านได้รับแรงบันดาลใจจากอะไร?", "กลอนสุนทรภู่มีเอกลักษณ์อย่างไร?", "ชีวิตส่วนตัวของท่านเป็นอย่างไร?"] },
+                    { id: "r2", name: "แม่ค้าคลองแสนแสบ", role: "ชาวบ้านยุค พ.ศ. 2400", avatar: "🛶",
+                      greeting: "พายเรือมาเหนื่อยๆ รับขนมกล้วยร้อนๆ สักห่อไหมจ๊ะ?",
+                      keywords: ["คลองแสนแสบสร้างเพื่ออะไร?", "ชีวิตชาวบ้านกรุงเทพฯ ยุคนั้นเป็นอย่างไร?", "สินค้าในตลาดน้ำมีอะไรบ้าง?", "รัชกาลที่ 5 เปลี่ยนแปลงชีวิตชาวบ้านอย่างไร?"] }
+                ]
+            }
+        };
+
+        // ========== USER PROFILE & ACHIEVEMENTS ==========
+        const ACHIEVEMENTS = [
+            { id: 'first_msg',   emoji: '🗣️', name: 'ผู้กล้าพูด',         desc: 'ส่งข้อความแรก',                xp: 50  },
+            { id: 'first_king',  emoji: '👑', name: 'เฝ้าราชสำนัก',       desc: 'คุยกับพระมหากษัตริย์',          xp: 80  },
+            { id: 'era_2',       emoji: '⏳', name: 'นักเดินทางข้ามเวลา',  desc: 'สำรวจ 2 ยุคสมัย',              xp: 100 },
+            { id: 'era_all',     emoji: '🏛️', name: 'จตุรยุค',            desc: 'สำรวจครบทั้ง 4 ยุคสมัย',        xp: 300 },
+            { id: 'msg_10',      emoji: '💬', name: 'นักสนทนา',            desc: 'ส่งข้อความ 10 ครั้ง',            xp: 120 },
+            { id: 'msg_50',      emoji: '📚', name: 'นักประวัติศาสตร์',    desc: 'ส่งข้อความ 50 ครั้ง',            xp: 400 },
+            { id: 'all_eras_ch', emoji: '🌏', name: 'ผู้รู้รอบโลก',        desc: 'คุยกับตัวละครครบทุกยุค',         xp: 250 },
+            { id: 'map_all',     emoji: '🗺️', name: 'นักสำรวจแผนที่',     desc: 'เลื่อนแถบเวลาผ่านทุกยุค',        xp: 150 },
+            { id: 'buy_1',       emoji: '🏺', name: 'นักสะสม',             desc: 'ซื้อโบราณวัตถุชิ้นแรก',           xp: 100 },
+            { id: 'buy_5',       emoji: '🗃️', name: 'นักสะสมมืออาชีพ',    desc: 'มีโบราณวัตถุ 5 ชิ้น',             xp: 300 },
+        ];
+
+        const LEVELS = [
+            { min: 0,    label: 'ผู้เริ่มต้น' },
+            { min: 100,  label: 'นักเรียนประวัติศาสตร์' },
+            { min: 300,  label: 'นักสำรวจยุคสมัย' },
+            { min: 600,  label: 'ผู้รู้แห่งกาลเวลา' },
+            { min: 1000, label: 'นักประวัติศาสตร์มืออาชีพ' },
+            { min: 1500, label: 'ปราชญ์แห่งอาณาจักร' },
+        ];
+
+        function defaultProfile() {
+            return { name: 'นักสำรวจ', xp: 0, totalMessages: 0, totalChats: 0,
+                     chatWithKing: false, erasVisited: [], erasSlid: [],
+                     charsChattedEras: [], unlockedAchievements: [], chatHistory: [],
+                     wallet: { sukho: 200, ayu: 200, thon: 100, ratana: 150 },
+                     collection: [] };
+        }
+
+        function loadProfile() {
+            try {
+                const raw = localStorage.getItem('histalk_profile');
+                if (raw) {
+                    const p = JSON.parse(raw);
+                    if (!p.wallet) p.wallet = { sukho: 200, ayu: 200, thon: 100, ratana: 150 };
+                    if (!p.collection) p.collection = [];
+                    return p;
+                }
+            } catch(e) {}
+            return defaultProfile();
+        }
+
+        function saveProfile() {
+            localStorage.setItem('histalk_profile', JSON.stringify(userProfile));
+        }
+
+        let userProfile = loadProfile();
+
+        function getLevelInfo(xp) {
+            let idx = 0;
+            for (let i = 0; i < LEVELS.length; i++) { if (xp >= LEVELS[i].min) idx = i; }
+            const nextMin = LEVELS[idx + 1] ? LEVELS[idx + 1].min : LEVELS[idx].min + 1000;
+            const prevMin = LEVELS[idx].min;
+            const pct = Math.min(Math.round(((xp - prevMin) / (nextMin - prevMin)) * 100), 100);
+            return { level: idx + 1, label: LEVELS[idx].label, nextXp: nextMin, progress: pct };
+        }
+
+        function checkAchievements() {
+            const p = userProfile;
+            const conditions = {
+                first_msg:   p.totalMessages >= 1,
+                first_king:  p.chatWithKing,
+                era_2:       (p.erasVisited || []).length >= 2,
+                era_all:     (p.erasVisited || []).length >= 4,
+                msg_10:      p.totalMessages >= 10,
+                msg_50:      p.totalMessages >= 50,
+                all_eras_ch: (p.charsChattedEras || []).length >= 4,
+                map_all:     (p.erasSlid || []).length >= 4,
+                buy_1:       (p.collection || []).length >= 1,
+                buy_5:       (p.collection || []).length >= 5,
+            };
+            ACHIEVEMENTS.forEach(ach => {
+                if (!p.unlockedAchievements.includes(ach.id) && conditions[ach.id]) {
+                    p.unlockedAchievements.push(ach.id);
+                    p.xp += ach.xp;
+                    saveProfile();
+                    showAchievementToast(ach);
+                }
+            });
+        }
+
+        function showAchievementToast(ach) {
+            const toast = document.getElementById('achievement-toast');
+            toast.innerHTML = `${ach.emoji} ปลดล็อก: <b>${ach.name}</b>&nbsp;<span style="color:var(--primary);">+${ach.xp} XP</span>`;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3500);
+        }
+
+        function addToSet(arr, val) {
+            if (!arr.includes(val)) arr.push(val);
+        }
+
+        function trackChatStart(char, era) {
+            userProfile.totalChats++;
+            addToSet(userProfile.erasVisited, era);
+            addToSet(userProfile.charsChattedEras, era);
+            if (char.id && char.id.startsWith('king_')) userProfile.chatWithKing = true;
+            const existing = userProfile.chatHistory.find(h => h.charId === (char.id || char.name) && h.era === era);
+            if (existing) {
+                existing.lastDate = new Date().toLocaleDateString('th-TH');
+            } else {
+                userProfile.chatHistory.unshift({
+                    charId: char.id || char.name, charName: char.name,
+                    charAvatar: char.avatar, era,
+                    eraName: database[era] ? database[era].name : era,
+                    msgCount: 0, lastDate: new Date().toLocaleDateString('th-TH')
+                });
+                if (userProfile.chatHistory.length > 20) userProfile.chatHistory.pop();
+            }
+            saveProfile();
+            checkAchievements();
+        }
+
+        function trackMessage(text, role) {
+            userProfile.totalMessages++;
+            if (userProfile.chatHistory.length > 0) {
+                userProfile.chatHistory[0].msgCount++;
+                if (text) {
+                    if (!userProfile.chatHistory[0].messages) userProfile.chatHistory[0].messages = [];
+                    userProfile.chatHistory[0].messages.push({ role: role || 'user', text });
+                    if (userProfile.chatHistory[0].messages.length > 10) userProfile.chatHistory[0].messages.shift();
+                }
+            }
+            if (!userProfile.wallet) userProfile.wallet = { sukho: 0, ayu: 0, thon: 0, ratana: 0 };
+            userProfile.wallet[currentEra] = (userProfile.wallet[currentEra] || 0) + 15;
+            saveProfile();
+            checkAchievements();
+        }
+
+        function trackSlider(era) {
+            const isNew = !(userProfile.erasSlid || []).includes(era);
+            addToSet(userProfile.erasSlid, era);
+            if (isNew) {
+                if (!userProfile.wallet) userProfile.wallet = { sukho: 0, ayu: 0, thon: 0, ratana: 0 };
+                userProfile.wallet[era] = (userProfile.wallet[era] || 0) + 20;
+            }
+            saveProfile();
+            checkAchievements();
+        }
+
+        // ── MUSEUM PAGE ──
+        let museumFilter = 'all';
+        let museumTab = 'collection';
+
+        function switchMuseumTab(tab) {
+            museumTab = tab;
+            document.getElementById('m-tab-collection').classList.toggle('active', tab === 'collection');
+            document.getElementById('m-tab-shop').classList.toggle('active', tab === 'shop');
+            const filterRow = document.getElementById('museum-era-filter');
+            if (filterRow) filterRow.style.display = tab === 'shop' ? 'flex' : 'none';
+            renderMuseumContent();
+        }
+
+        function setMuseumFilter(era) {
+            museumFilter = era;
+            document.querySelectorAll('.era-filter-btn').forEach(b =>
+                b.classList.toggle('active', b.dataset.era === era));
+            renderMuseumContent();
+        }
+
+        function renderMuseumPage() {
+            const wallet = userProfile.wallet || {};
+            document.getElementById('museum-wallet').innerHTML =
+                Object.entries(ERA_CURRENCY).map(([eId, cur]) =>
+                    `<div class="era-wallet-chip" style="border-color:${cur.color}40;">
+                        <span>${cur.symbol}</span>
+                        <span style="color:${cur.color};font-size:0.7rem;">${(wallet[eId]||0).toLocaleString()}</span>
+                        <span class="price-currency">${cur.name}</span>
+                    </div>`
+                ).join('');
+
+            const eraOptions = [['all','ทั้งหมด'], ...Object.entries(ERA_CURRENCY).map(([eId, cur]) => [eId, database[eId].name])];
+            const filterEl = document.getElementById('museum-era-filter');
+            filterEl.innerHTML = eraOptions.map(([eId, label]) => {
+                const isActive = museumFilter === eId;
+                const cur = ERA_CURRENCY[eId];
+                const activeStyle = isActive && cur ? `background:${cur.color};border-color:${cur.color};color:white;` : '';
+                const baseActive = isActive && !cur ? 'active' : '';
+                return `<button class="era-filter-btn ${baseActive}" data-era="${eId}" style="${activeStyle}" onclick="setMuseumFilter('${eId}')">${label}</button>`;
+            }).join('');
+            filterEl.style.display = museumTab === 'shop' ? 'flex' : 'none';
+
+            renderMuseumContent();
+        }
+
+        function renderMuseumContent() {
+            const content = document.getElementById('museum-content');
+            const collection = userProfile.collection || [];
+            const rarityLabels = { common:'ธรรมดา', uncommon:'หายาก', rare:'หายากมาก', legendary:'ตำนาน', mythic:'ศักดิ์สิทธิ์' };
+
+            if (museumTab === 'collection') {
+                const ownedSet = new Set(collection);
+                const count = collection.length;
+                const total = ARTIFACTS.length;
+                const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                const cards = ARTIFACTS.map(art => {
+                    if (ownedSet.has(art.id)) {
+                        return `<div class="showcase-case rarity-${art.rarity}" title="${art.desc}">
+                            <div class="showcase-spotlight"></div>
+                            <span class="showcase-icon">${art.emoji}</span>
+                            <div class="showcase-name">${art.name}</div>
+                            <div class="showcase-plate">
+                                <div class="showcase-era-label">${art.eraName}</div>
+                            </div>
+                        </div>`;
+                    } else {
+                        return `<div class="showcase-case locked" title="${art.name} — ยังไม่ได้รับ">
+                            <span class="showcase-icon">${art.emoji}</span>
+                            <div class="showcase-name">${art.name}</div>
+                            <div class="showcase-plate">
+                                <div class="locked-label">🔒 ยังไม่ได้รับ</div>
+                            </div>
+                        </div>`;
+                    }
+                }).join('');
+                content.innerHTML = `
+                    <div class="showcase-progress">
+                        <div class="showcase-count-block">
+                            <div class="showcase-count">${count}</div>
+                            <div class="showcase-count-sub">/ ${total} ชิ้น</div>
+                        </div>
+                        <div class="showcase-prog-wrap">
+                            <div class="showcase-prog-label">
+                                <span>ความคืบหน้าคอลเลคชัน</span>
+                                <span>${pct}%</span>
+                            </div>
+                            <div class="showcase-prog-track">
+                                <div class="showcase-prog-fill" style="width:${pct}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="showcase-grid">${cards}</div>`;
+                return;
+            }
+
+            const filtered = museumFilter === 'all' ? ARTIFACTS : ARTIFACTS.filter(a => a.era === museumFilter);
+            const wallet = userProfile.wallet || {};
+            content.innerHTML = filtered.map(art => {
+                const owned = collection.includes(art.id);
+                const cur = ERA_CURRENCY[art.era];
+                const balance = wallet[art.era] || 0;
+                const canAfford = balance >= art.price;
+                return `
+                <div class="artifact-card rarity-${art.rarity}${owned?' owned':''}">
+                    <div class="rarity-bar ${art.rarity}"></div>
+                    <div class="artifact-header">
+                        <div class="artifact-icon">${art.emoji}</div>
+                        <div class="artifact-info">
+                            <div class="artifact-name">${art.name}</div>
+                            <span class="artifact-era-tag">${art.eraName} · ${art.year}</span>
+                            <span class="rarity-tag ${art.rarity}">${rarityLabels[art.rarity]||art.rarity}</span>
+                        </div>
+                    </div>
+                    <p class="artifact-desc">${art.desc}</p>
+                    <div class="artifact-footer">
+                        <div class="artifact-price">
+                            <span>${cur.symbol}</span>
+                            <span>${art.price.toLocaleString()}</span>
+                            <span class="price-currency">${cur.name}</span>
+                            ${!owned ? `<span class="price-currency">&nbsp;(มี ${balance.toLocaleString()})</span>` : ''}
+                        </div>
+                        ${owned
+                            ? `<div class="owned-badge">✓ เป็นเจ้าของแล้ว</div>`
+                            : `<button class="buy-btn${canAfford?'':' insufficient'}" onclick="buyArtifact('${art.id}')"${canAfford?'':' disabled'}>${canAfford?'ซื้อ':'เงินไม่พอ'}</button>`
+                        }
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function buyArtifact(artId) {
+            const art = ARTIFACTS.find(a => a.id === artId);
+            if (!art) return;
+            if (!userProfile.wallet) userProfile.wallet = { sukho: 0, ayu: 0, thon: 0, ratana: 0 };
+            if (!userProfile.collection) userProfile.collection = [];
+            const balance = userProfile.wallet[art.era] || 0;
+            if (balance < art.price || userProfile.collection.includes(artId)) return;
+            userProfile.wallet[art.era] -= art.price;
+            userProfile.collection.push(artId);
+            userProfile.xp += 30;
+            saveProfile();
+            showAchievementToast({ emoji: art.emoji, name: `ได้รับ: ${art.name}`, xp: 30 });
+            checkAchievements();
+            renderMuseumPage();
+        }
+
+        // ── PAGE NAVIGATION ──
+        let chatPanelWasVisible = false;
+
+        function showPage(page) {
+            // Hide all content panes
+            document.getElementById('char-selection-view').style.display = 'none';
+            document.getElementById('chat-panel').style.display = 'none';
+            document.getElementById('museum-page').style.display = 'none';
+            document.getElementById('user-page').style.display = 'none';
+
+            // Update nav tabs
+            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+
+            if (page === 'chat') {
+                document.getElementById('nav-chat').classList.add('active');
+                if (chatPanelWasVisible) {
+                    document.getElementById('chat-panel').style.display = 'flex';
+                } else {
+                    document.getElementById('char-selection-view').style.display = 'flex';
+                }
+            } else if (page === 'museum') {
+                document.getElementById('nav-museum').classList.add('active');
+                document.getElementById('museum-page').style.display = 'flex';
+                renderMuseumPage();
+            } else if (page === 'profile') {
+                document.getElementById('nav-profile').classList.add('active');
+                document.getElementById('user-page').style.display = 'flex';
+                renderUserPage();
+            }
+            lucide.createIcons();
+        }
+
+        function renderUserPage() {
+            const lvl = getLevelInfo(userProfile.xp);
+            document.getElementById('up-name').textContent = userProfile.name;
+            document.getElementById('up-level-label').textContent = `ระดับ ${lvl.level} · ${lvl.label}`;
+            document.getElementById('up-xp-label').textContent = `${userProfile.xp} / ${lvl.nextXp} XP`;
+            document.getElementById('up-xp-fill').style.width = lvl.progress + '%';
+            document.getElementById('up-stat-msgs').textContent = userProfile.totalMessages;
+            document.getElementById('up-stat-eras').textContent = (userProfile.erasVisited || []).length;
+            document.getElementById('up-stat-chats').textContent = userProfile.totalChats;
+
+            
+            const hist = userProfile.chatHistory || [];
+            document.getElementById('history-list').innerHTML = hist.length === 0
+                ? `<div class="empty-state"><span class="es-icon">💬</span>ยังไม่มีประวัติการสนทนา<br>เลือกตัวละครและเริ่มคุยได้เลย!</div>`
+                : hist.map(h => `
+                    <div class="history-item">
+                        <div class="history-avatar">${getAvatarSVG({ id: h.charId, avatar: h.charAvatar, era: h.era })}</div>
+                        <div class="history-info">
+                            <div class="hi-name">${h.charName}</div>
+                            <div class="hi-meta">ยุค${h.eraName} · ${h.lastDate}</div>
+                        </div>
+                        <div class="hi-count">${h.msgCount} msg</div>
+                    </div>`).join('');
+
+        }
+
+        let currentEra = 'ayu';
+        let currentCharacter = database.ayu.characters[0];
+        let currentKingChar = null;
+        let isCallMode = false;
+
+        const eraPillColors = { sukho: '#8B6914', ayu: '#8B1A1A', thon: '#4A1A7A', ratana: '#1A4A8A' };
+        const eraPillEmoji = { sukho: '👑', ayu: '⚔️', thon: '🏹', ratana: '📜' };
+
+        function getEraForYear(year) {
+            if (year < 1893) return 'sukho';
+            if (year < 2310) return 'ayu';
+            if (year < 2325) return 'thon';
+            return 'ratana';
+        }
+
+        function handleSliderChange(year) {
+            year = parseInt(year);
+            const eraId = getEraForYear(year);
+            const prevEra = currentEra;
+            currentEra = eraId;
+            trackSlider(eraId);
+
+            // อัปเดตปีที่แสดง
+            document.getElementById('year-display').innerText = `พ.ศ. ${year}`;
+            document.getElementById('year-ce').innerText = `ค.ศ. ${year - 543}`;
+
+            // อัปเดต era pill
+            const pill = document.getElementById('era-pill');
+            pill.style.background = eraPillColors[eraId];
+            pill.innerText = `${eraPillEmoji[eraId]} ยุค${database[eraId].name}`;
+
+            // ไฮไลต์ยุคที่ active บน color bar
+            document.querySelectorAll('.era-bar-seg').forEach(s => s.classList.remove('active'));
+            document.getElementById(`era-seg-${eraId}`).classList.add('active');
+
+            updateMap(eraId);
+            renderEraInfo(eraId, year);
+
+            const newKing = getCurrentKing(year);
+            const newKingChar = newKing ? kingToCharacter(newKing) : null;
+            const kingChanged = newKingChar?.id !== currentKingChar?.id;
+            currentKingChar = newKingChar;
+
+            if (eraId !== prevEra) {
+                renderCharacterList();
+                showCharacterSelection();
+            } else if (kingChanged) {
+                renderCharacterList(); // silently refresh the card list
+            }
+        }
+
+        function jumpToYear(year) {
+            document.getElementById('era-range-slider').value = year;
+            handleSliderChange(year);
+        }
+
+        function showCharacterSelection() {
+            if (isCallMode) toggleCallMode();
+            chatPanelWasVisible = false;
+            document.getElementById('selection-era-name').innerText = database[currentEra].name;
+            showPage('chat');
+        }
+
+        function renderCharacterList() {
+            const grid = document.getElementById('char-cards-grid');
+            if (!grid) return;
+            grid.innerHTML = '';
+            const chars = currentKingChar
+                ? [currentKingChar, ...database[currentEra].characters]
+                : database[currentEra].characters;
+            chars.forEach((char, i) => {
+                if (!char.era) char.era = currentEra;
+                const isKingCard = i === 0 && !!currentKingChar;
+                const btn = document.createElement('button');
+                btn.className = `char-card${isKingCard ? ' king-card' : ''}`;
+                btn.onclick = () => selectCharacter(char);
+                const notable = isKingCard && char.kingData
+                    ? char.kingData.notable
+                    : (char.keywords ? char.keywords[0] : '');
+                btn.innerHTML = `
+                    <div class="char-card-avatar">${getAvatarSVG(char)}</div>
+                    <div class="char-card-info">
+                        <h4>${char.name}</h4>
+                        <p class="role">${char.role}</p>
+                        ${notable ? `<p class="notable">${notable}</p>` : ''}
+                    </div>
+                `;
+                grid.appendChild(btn);
+            });
+            document.getElementById('selection-era-name').innerText = database[currentEra].name;
+        }
+
+        function selectCharacter(char) {
+            if (!char.era) char.era = currentEra;
+            currentCharacter = char;
+            trackChatStart(char, currentEra);
+
+            // Switch to chat panel
+            chatPanelWasVisible = true;
+            showPage('chat');
+
+            document.getElementById('header-avatar').innerHTML = getAvatarSVG(char);
+            document.getElementById('header-name').innerText = char.name;
+            document.getElementById('header-subtitle').innerText = `สวมบทบาทโดย HisTalk AI • ยุค${database[currentEra].name}`;
+            document.getElementById('call-avatar-emoji').innerHTML = getAvatarSVG(char);
+            document.getElementById('call-target-name').innerText = char.name;
+
+            const chatView = document.getElementById('chat-view');
+            const now = new Date();
+            const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')} น.`;
+            const chipsHtml = char.keywords && char.keywords.length ? `
+                <div class="keyword-chips">
+                    <span class="chips-label">ลองถามเกี่ยวกับ:</span>
+                    ${char.keywords.map(kw => `<button class="keyword-chip" onclick="askKeyword('${kw}')">${kw}</button>`).join('')}
+                </div>` : '';
+            chatView.innerHTML = `
+                <div class="msg-row bot-row">
+                    <div class="msg-avatar">${getAvatarSVG(char)}</div>
+                    <div class="msg-bubble-wrapper">
+                        <div class="msg-bubble bot">
+                            <p>${char.greeting}</p>
+                            <span class="msg-time">${timeStr}</span>
+                        </div>
+                    </div>
+                </div>
+                ${chipsHtml}
+            `;
+        }
+
+        function askKeyword(text) {
+            const chips = document.querySelector('.keyword-chips');
+            if (chips) chips.style.display = 'none';
+            sendMessage(text);
+        }
+
+        function toggleCallMode() {
+            isCallMode = !isCallMode;
+            const chatView = document.getElementById('chat-view');
+            const callView = document.getElementById('call-view');
+            const footer = document.getElementById('panel-footer');
+            const callBtn = document.getElementById('call-btn');
+
+            if (isCallMode) {
+                chatView.style.display = 'none'; callView.style.display = 'flex'; footer.style.display = 'none';
+                callBtn.classList.add('in-call'); document.getElementById('call-btn-text').innerText = 'วางสายจำลอง';
+            } else {
+                chatView.style.display = 'flex'; callView.style.display = 'none'; footer.style.display = 'block';
+                callBtn.classList.remove('in-call'); document.getElementById('call-btn-text').innerText = 'โทรคุยด้วยเสียง';
+            }
+        }
+
+        function sendMessage(overrideText) {
+            const input = document.getElementById('chat-input');
+            const text = overrideText || input.value.trim();
+            if (!text) return;
+            input.value = '';
+            trackMessage(text, 'user');
+
+            const now = new Date();
+            const ts = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')} น.`;
+            const chatView = document.getElementById('chat-view');
+            
+            // Create user row with avatar
+            const userRow = document.createElement('div');
+            userRow.className = 'msg-row user-row';
+            userRow.innerHTML = `
+                <div class="msg-bubble-wrapper">
+                    <div class="msg-bubble user">
+                        <p>${text}</p>
+                        <span class="msg-time">${ts}</span>
+                    </div>
+                </div>
+                <div class="msg-avatar">${getUserAvatarSVG()}</div>
+            `;
+            chatView.appendChild(userRow);
+
+            const body = document.getElementById('interaction-body');
+            body.scrollTop = body.scrollHeight;
+
+            setTimeout(() => {
+                const now2 = new Date();
+                const ts2 = `${now2.getHours().toString().padStart(2,'0')}:${now2.getMinutes().toString().padStart(2,'0')} น.`;
+                const botReply = `ข้าได้รับคำถามเรื่อง "${text}" แล้วออเจ้า เมื่อระบบเชื่อมต่อ API เสร็จสิ้น ข้าจะตอบเจ้าแบบเจาะลึกแน่นอน!`;
+                
+                // Create bot row with avatar
+                const botRow = document.createElement('div');
+                botRow.className = 'msg-row bot-row';
+                if (!currentCharacter.era) currentCharacter.era = currentEra;
+                botRow.innerHTML = `
+                    <div class="msg-avatar">${getAvatarSVG(currentCharacter)}</div>
+                    <div class="msg-bubble-wrapper">
+                        <div class="msg-bubble bot">
+                            <p><b>[HisTalk AI]:</b> ${botReply}</p>
+                            <span class="msg-time">${ts2}</span>
+                        </div>
+                    </div>
+                `;
+                chatView.appendChild(botRow);
+                body.scrollTop = body.scrollHeight;
+                if (userProfile.chatHistory.length > 0) {
+                    if (!userProfile.chatHistory[0].messages) userProfile.chatHistory[0].messages = [];
+                    userProfile.chatHistory[0].messages.push({ role: 'bot', text: botReply });
+                    if (userProfile.chatHistory[0].messages.length > 10) userProfile.chatHistory[0].messages.shift();
+                    saveProfile();
+                }
+            }, 800);
+        }
+
+        window.onload = () => {
+            lucide.createIcons();
+            initMap();
+            handleSliderChange(1893);
+            renderCharacterList();
+            showCharacterSelection();
+            document.getElementById('up-avatar').innerHTML = getUserAvatarSVG();
+        };
+    </script>
+</body>
+</html>
